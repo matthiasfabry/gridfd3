@@ -1,0 +1,8 @@
+temp
+.project
+.cproject
+.DS_Store
+.idea/*
+.settings
+9_Sgr/thread*/**
+
