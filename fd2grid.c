@@ -1,5 +1,5 @@
 /*****************************************************************************/
-#define THIS_IS "fd3grid v.1. (Fabry, 22 Nov 2019)"
+#define THIS_IS "fd2grid v.1.1 (Fabry, 16 Dec 2019)"
 /*****************************************************************************/
 
 #include <stdio.h>
@@ -13,13 +13,13 @@
 #include <gsl/gsl_multimin.h>
 
 #include "mxfuns.h"
-#include "fd3sep.h"
+#include "fd2sep.h"
 #include "orb.h"
 
 /*****************************************************************************/
 
 /* function and macro to kill the program with a short message */
-#define FDBErrorString "\nError in fd3grid"
+#define FDBErrorString "\nError in fd2grid"
 #define DIE(s) {fprintf(stderr,"%s: %s\n",FDBErrorString,s);fdbfailure();};
 void fdbfailure(void) { exit ( EXIT_FAILURE ); }
 
@@ -90,7 +90,6 @@ int main ( int argc, char *argv[] ) {
 	sig = *MxAlloc ( 1, M );
 	rvm = MxAlloc ( K, M );
 	lfm = MxAlloc ( K, M );
-
 	for ( j = 0 ; j < M ; j++ ) {
 		GETDBL(otimes+j);
 		GETDBL(rvcorr+j);
@@ -163,7 +162,7 @@ double meritfn ( double *opin, double rvA, double rvB ) {
 			*(*(rvm+k)+j) = rv[k] + *(rvcorr+j) / rvstep;
 	}
 
-	return fd3sep ( K, M, N, dftobs, sig, rvm, lfm);
+	return fd2sep ( K, M, N, dftobs, sig, rvm, lfm);
 }
 
 /*****************************************************************************/

@@ -15,7 +15,7 @@ import scipy.interpolate as spint
 starttime = time.time()
 
 
-class Fd3gridLine:
+class Fd2gridLine:
 
     def __init__(self, name, limits):
         self.name = name
@@ -75,9 +75,12 @@ class Fd3gridLine:
         print(' this line uses {} spectra'.format(len(self.files)))
 
     def run(self, wd, perturb: bool = False, iteration: int = None):
+        print(' making input files')
         self._make_infile(wd, perturb)
         self._make_masterfile(wd, perturb)
+        print(' running fd2grid')
         self._run_fd3grid(wd)
+        print(' saving output')
         self._save_output(wd, iteration)
 
     def perturb_data(self):
@@ -99,25 +102,20 @@ class Fd3gridLine:
             infile.write(wd + "/master{}.obs ".format(self.name))
             infile.write("{} ".format(self.limits[0]))
             infile.write("{} \n".format(self.limits[1]))
-            # record mjds if we would need it later
-            print('saving mjds')
-            np.save('/Users/matthiasf/Software/fd3grid/' + wd + "/mjds{}".format(self.name), self.mjds)
             # write observation data
             for j in range(len(self.files)):
                 infile.write(
-                    str(self.mjds[j]) + ' 0 {} 1.0 1.0 1.0 \n'.format(
-                        self.noises[j]))  # correction, noise, lfA, lfB, lfC
+                    str(self.mjds[j]) + ' 0 {} 1.0 1.0 \n'.format(self.noises[j]))  # correction, noise, lfA, lfB
             infile.write('\n')
             # write the A-B orbital params
             if perturb:
                 params = self.perturb_orbit()
             else:
                 params = orbit
-            infile.write('1 1 0 0 0 0 \n')  # dummy parameters for the wide AB--C orbit
-            infile.write('{} {} {} {} 0\n\n'.format(params[0], params[1], params[2], params[3]))
+            infile.write('{} {} {} {}\n\n'.format(params[0], params[1], params[2], params[3]))
             # write rv ranges and step size
-            infile.write('11 55 1\n')
-            infile.write('25 70 1\n')
+            infile.write('5 70 1\n')
+            infile.write('5 100 1\n')
 
     def _make_masterfile(self, wd, perturb: bool = False):
         with open(wd + '/master{}.obs'.format(self.name), 'w') as obsfile:
@@ -135,9 +133,8 @@ class Fd3gridLine:
                 obsfile.write('\n')
 
     def _run_fd3grid(self, wd):
-        print('running fd3grid for {}'.format(self.name))
         with open(wd + '/in{}'.format(self.name)) as inpipe, open(wd + '/out{}'.format(self.name), 'w') as outpipe:
-            sp.run(['./fd3grid'], stdin=inpipe, stdout=outpipe)
+            sp.run(['./fd2grid'], stdin=inpipe, stdout=outpipe)
 
     def _save_output(self, wd, iteration):
         with open(wd + '/out{}'.format(self.name), 'r') as f:
@@ -158,13 +155,13 @@ class Fd3gridLine:
                  k2s=k2s, chisq=chisq)
 
 
-class Fd3gridThread(threading.Thread):
+class Fd2gridThread(threading.Thread):
 
-    def __init__(self, threadno, iterations, fd3gridlines: typing.List[Fd3gridLine]):
+    def __init__(self, threadno, iterations, fd2gridlines: typing.List[Fd2gridLine]):
         super().__init__()
         self.threadno = threadno
-        self.wd = fd3_folder + "/thread" + str(threadno)
-        self.fd3gridlines = fd3gridlines
+        self.wd = fd2_folder + "/thread" + str(threadno)
+        self.fd2gridlines = fd2gridlines
         self.iterations = iterations
         self.threadtime = time.time()
         self.chisqs = list()
@@ -186,15 +183,15 @@ class Fd3gridThread(threading.Thread):
         try:
             for ii in range(self.iterations):
                 # execute fd3gridline runs
-                print('Thread {} running fd3grid Iteration {}...'.format(self.threadno, ii + 1))
-                for ffd3line in self.fd3gridlines:
+                print('Thread {} running fd2grid iteration {}...'.format(self.threadno, ii + 1))
+                for ffd3line in self.fd2gridlines:
                     ffd3line.run(self.wd, True, ii + 1)
                 print('estimated time to completion of thread {}: {}h'.format(self.threadno,
                                                                               (time.time() - self.threadtime) * (
                                                                                       self.iterations - ii - 1) / 3600))
                 self.threadtime = time.time()
         except Exception as e:
-            print('Exception occured:', e)
+            print('Exception occured when running fd2grid:', e)
 
 
 print('starting setup...')
@@ -208,8 +205,8 @@ except IndexError:
 if not os.path.isdir(obj):
     os.mkdir(obj)
 
-fd3_folder = obj
-print('fd3_folder is {}'.format(fd3_folder))
+fd2_folder = obj
+print('fd2_folder is {}'.format(fd2_folder))
 spec_folder = None
 try:
     spec_folder = glob.glob('/Users/matthiasf/Data/Spectra/' + obj)[0]
@@ -217,7 +214,7 @@ except IndexError:
     print('no spectra folder of object found')
     exit()
 
-print('spectroscopy folder is {}'.format(spec_folder))
+print('spectroscopy folder is {}\n'.format(spec_folder))
 monte_carlo = False
 try:
     monte_carlo = sys.argv[2] == 'True'
@@ -238,11 +235,11 @@ orbit_err = (0.15, 2.5, 0.001, 0.5)
 
 # enter ln(lambda/A) range and name of line
 lines = dict()
-lines['Hzeta'] = (8.2630, 8.2685)
+# lines['Hzeta'] = (8.2630, 8.2685)
 # lines['Hepsilon'] = (8.2845, 8.2888)
-lines['HeI+II4026'] = (8.2990, 8.302)
+# lines['HeI+II4026'] = (8.2990, 8.302)
 lines['Hdelta'] = (8.3170, 8.3215)
-lines['SiIV4116'] = (8.3215, 8.3238)
+# lines['SiIV4116'] = (8.3215, 8.3238)
 # lines['HeII4200'] = (8.3412, 8.3444)
 # lines['Hgamma'] = (8.3730, 8.3785)
 # lines['HeI4471'] = (8.4047, 8.4064)
@@ -259,11 +256,11 @@ lines['SiIV4116'] = (8.3215, 8.3238)
 # lines['HeI5875'] = (8.6777, 8.6794)
 
 K = len(lines)
-fd3lines = list()
-print('building fd3gridline object for:')
+fd2lines = list()
+print('building fd2gridline object for:')
 for line in lines.keys():
     print(' {}'.format(line))
-    fd3lines.append(Fd3gridLine(line, lines[line]))
+    fd2lines.append(Fd2gridLine(line, lines[line]))
 
 if monte_carlo:
     N = 1000
@@ -275,12 +272,12 @@ if monte_carlo:
     remainder = int(N % cpus)
     threads = list()
     for i in range(remainder):
-        threads.append(Fd3gridThread(i + 1, int(N / cpus) + 1, fd3lines))
+        threads.append(Fd2gridThread(i + 1, int(N / cpus) + 1, fd2lines))
     for i in range(remainder, cpus):
-        threads.append(Fd3gridThread(i + 1, int(N / cpus), fd3lines))
+        threads.append(Fd2gridThread(i + 1, int(N / cpus), fd2lines))
 
     setuptime = time.time()
-    print('setup took {}s'.format(setuptime - starttime))
+    print('setup took {}s\n'.format(setuptime - starttime))
 
     for thread in threads:
         thread.run()
@@ -291,7 +288,7 @@ if monte_carlo:
     print('All runs done in {}h, see you later!'.format((time.time() - starttime) / 3600))
 else:
     setuptime = time.time()
-    print('setup took {}s'.format(setuptime - starttime))
-    for fd3line in fd3lines:
-        print('handling {} line'.format(fd3line.name))
-        fd3line.run(fd3_folder)
+    print('setup took {}s\n'.format(setuptime - starttime))
+    for fd2line in fd2lines:
+        print('handling {} line'.format(fd2line.name))
+        fd2line.run(fd2_folder)

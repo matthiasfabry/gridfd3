@@ -1,11 +1,11 @@
 
-all: fd3grid
+all: fd2grid
 
 clean :
-	rm fd3grid *.o
+	rm fd2grid *.o
 
-fd3grid : fd3grid.o fd3sep.o orb.o kepler.o mxfuns.o
-	${CC} -Wall fd3grid.o fd3sep.o orb.o kepler.o mxfuns.o \
+fd2grid : fd2grid.o fd2sep.o orb.o kepler.o mxfuns.o
+	${CC} -Wall fd2grid.o fd2sep.o orb.o kepler.o mxfuns.o \
 		-lgsl -lgslcblas -lm -o $@
 
 .c.o :

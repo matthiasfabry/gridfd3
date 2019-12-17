@@ -30,14 +30,12 @@ def file_analyser(ffiles):
 
 def plot_contours(kk1s, kk2s, cchisq):
     fig = plt.figure(figsize=(9, 6))
-    ax = fig.add_subplot(111)
+    aax = fig.add_subplot(111)
     k1grid, k2grid = np.meshgrid(kk1s, kk2s)
-    contour = ax.contourf(k1grid, k2grid, cchisq, levels=50, cmap='inferno')
-    ax.set_title(r"$\chi^2_{\nu}$")
-    ax.set_xlabel(r'$K_1(km/s)$')
-    ax.set_ylabel(r'$K_2(km/s)$')
-    fig.colorbar(contour, ax=ax)
-    return ax
+    contour = aax.contourf(k1grid, k2grid, cchisq, levels=50, cmap='inferno')
+
+    fig.colorbar(contour, ax=aax)
+    return aax
 
 
 def mark_minimum(aax, kk1s, kk2s, cchisq):
@@ -59,30 +57,39 @@ except IndexError:
     exit()
 
 lines = dict()
-# lines['Hzeta'] = (8.2630, 8.2685)
+lines['Hzeta'] = (8.2630, 8.2685)
 # lines['Hepsilon'] = (8.2845, 8.2888)
-# lines['HeI+II4026'] = (8.2990, 8.302)
+lines['HeI+II4026'] = (8.2990, 8.302)
 lines['Hdelta'] = (8.3170, 8.3215)
 # lines['SiIV4116'] = (8.3215, 8.3238)
-# lines['HeII4200'] = (8.3412, 8.3444)
-# lines['Hgamma'] = (8.3730, 8.3785)
-# lines['HeI4471'] = (8.4047, 8.4064)
-# lines['HeII4541'] = (8.4195, 8.4226)
-# lines['NV4604+4620'] = (8.4338, 8.4390)
-# lines['HeII4686'] = (8.4510, 8.4534)
-# lines['Hbeta'] = (8.4860, 8.4920)
-# lines['HeII5411'] = (8.5940, 8.5986)
-# lines['OIII5592'] = (8.6281, 8.6300)
+lines['HeII4200'] = (8.3412, 8.3444)
+lines['Hgamma'] = (8.3730, 8.3785)
+lines['HeI4471'] = (8.4047, 8.4064)
+lines['HeII4541'] = (8.4195, 8.4226)
+lines['NV4604+4620'] = (8.4338, 8.4390)
+lines['HeII4686'] = (8.4510, 8.4534)
+lines['Hbeta'] = (8.4860, 8.4920)
+lines['HeII5411'] = (8.5940, 8.5986)
+lines['OIII5592'] = (8.6281, 8.6300)
 # lines['CIII5696'] = (8.6466, 8.6482)
 # lines['FeII5780'] = (8.6617, 8.6627)
-# lines['CIV5801'] = (8.6652, 8.6667)
-# lines['CIV5812'] = (8.6668, 8.6685)
-# lines['HeI5875'] = (8.6777, 8.6794)
+lines['CIV5801'] = (8.6652, 8.6667)
+lines['CIV5812'] = (8.6668, 8.6685)
+lines['HeI5875'] = (8.6777, 8.6794)
 files = list()
+title = r"$\chi^2_\nu$"
 for key in lines.keys():
-    files.append(glob.glob(folder + '/**/chisq{}*'.format(key))[0])
+    files.append(glob.glob(folder + '/**/chisq{}.npz'.format(key))[0])
+    title += " ${}$".format(key)
 k1s, k2s, chisq = file_analyser(files)
 ax = plot_contours(k1s, k2s, chisq)
+plottitle = title
+if len(lines) > 5:
+    plottitle = r"$\chi^2_\nu$ multiple lines"
+ax.set_title(plottitle)
+ax.set_xlabel(r'$K_1(km/s)$')
+ax.set_ylabel(r'$K_2(km/s)$')
 mark_minimum(ax, k1s, k2s, chisq)
 plt.tight_layout()
+plt.savefig(folder + '/{}.png'.format(title).replace("$", "").replace('\\', '').replace(' ', ''))
 plt.show()
