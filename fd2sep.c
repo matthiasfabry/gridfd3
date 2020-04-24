@@ -1,4 +1,3 @@
-
 #include <math.h>
 #include <stdlib.h>
 
@@ -85,7 +84,6 @@ double fd2sep ( long K, long M, long N, double **dftobs, double *sig,
 			db = gsl_vector_get ( b, 2*j+i ) - bc;
 			s2 += db * db * ( n % ((N+1)/2) ? 2 : 1 );
 		}
-
 	}
 
 	/* close */
@@ -125,7 +123,6 @@ void dft_fwd ( long m, long n, double **mxin, double **mxout ) {
 
 	gsl_fft_real_wavetable_free ( dft_rewt );
 	gsl_fft_real_workspace_free ( dft_rews );
-
 }
 
 /*************************************************************************/

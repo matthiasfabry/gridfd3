@@ -4,5 +4,6 @@ temp
 .DS_Store
 .idea/*
 .settings
-9_Sgr/thread*/**
+9_Sgr/**
+LB-1/**
 
