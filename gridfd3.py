@@ -1,46 +1,26 @@
-import matplotlib.pyplot as plt
 import glob
 import os
 import re
 import shutil
 import subprocess as sp
-import sys
 import threading
 import time
 import typing
 
 import astropy.io.fits as fits
-import matplotlib as mpl
+import matplotlib.pyplot as plt
 import numpy as np
 import scipy.interpolate as spint
 
 import outfile_analyser as oa
-mpl.use('pgf')
-pgf_with_latex = {                      # setup matplotlib to use latex for output
-    "pgf.texsystem": "pdflatex",        # change this if using xetex or lautex
-    "text.usetex": True,                # use LaTeX to write all text
-    "font.family": "serif",
-    "font.serif": [],                   # blank entries should cause plots
-    "font.sans-serif": [],              # to inherit fonts from the document
-    "font.monospace": [],
-    "axes.labelsize": 16,               # LaTeX default is 10pt font.
-    "font.size": 16,
-    "legend.fontsize": 8,               # Make the legend/label fonts
-    "xtick.labelsize": 12,               # a little smaller
-    "ytick.labelsize": 12,
-    "pgf.preamble": [
-        r"\usepackage[utf8x]{inputenc}",    # use utf8 fonts
-        r"\usepackage[T1]{fontenc}",        # plots will be generated
-        r"\usepackage{siunitx}"
-        ]                                   # using this preamble
-    }
+# noinspection PyUnresolvedReferences
+import plotsetup
 
-plt.rcParams.update(pgf_with_latex)
-#%%
+# %%
 starttime = time.time()
 
 
-class Fd2gridLine:
+class Fd3gridLine:
 
     def __init__(self, name, limits, samp):
         self.name = name
@@ -109,13 +89,13 @@ class Fd2gridLine:
     def run(self, wd, iteration: int = None):
         if not iteration:
             print(' making in file')
-        self._make_infile(wd)
+        self._make_infile(wd, iteration)
         if not iteration:
             print(' making master file')
-        self._make_masterfile(wd)
+        self._make_masterfile(wd, iteration)
         if not iteration:
             print(' running gridfd3')
-        self._run_fd2grid(wd)
+        self._run_fd3grid(wd)
         if not iteration:
             print(' saving output')
         self._save_output(wd, iteration)
@@ -132,32 +112,43 @@ class Fd2gridLine:
     def perturb_orbit():
         return orbit + np.random.default_rng().normal(0, orbit_err, 4)
 
-    def _make_infile(self, wd):
+    def _make_infile(self, wd, iteration=None):
         with open(wd + '/in{}'.format(self.name), 'w') as infile:
             # write first line
             infile.write(wd + "/master{}.obs ".format(self.name))
             infile.write("{} ".format(self.limits[0]))
             infile.write("{} \n".format(self.limits[1]))
+            # write the star switches
+            if thirdlight:
+                infile.write('1 1 1 \n')
+            else:
+                infile.write('1 1 0 \n')
             # write observation data
             for j in range(len(self.used_spectra)):
-                infile.write(
-                    str(self.mjds[j]) + ' 0 {} 0.6 0.4 \n'.format(self.noises[j]))  # correction, noise, lfA, lfB
-            infile.write('\n')
-            # write the A-B orbital params
-            if perturb_orbit:
+                if thirdlight:
+                    infile.write(
+                        str(self.mjds[j]) + ' 0 {} {} {} {}\n'.format(self.noises[j], lfs[0], lfs[1], lfs[2]))
+                # correction, noise, lfA, lfB, lfC
+                else:
+                    infile.write(
+                        str(self.mjds[j]) + ' 0 {} {} {}\n'.format(self.noises[j], lfs[0], lfs[1]))
+                # correction, noise, lfA, lfB
+            if iteration and perturb_orbit:
                 params = self.perturb_orbit()
             else:
                 params = orbit
-            infile.write('{} {} {} {}\n\n'.format(params[0], params[1], params[2], params[3]))
+            infile.write('1 0 0 0 0 0 \n')  # dummy parameters for the wide AB--C orbit
+            # write the A-B orbital params
+            infile.write('{} {} {} {} 0\n'.format(params[0], params[1], params[2], params[3]))  # 0 is the Deltaomega
             # write rv ranges and step size
             infile.write('{}\n'.format(k1str))
             infile.write('{}\n'.format(k2str))
 
-    def _make_masterfile(self, wd):
+    def _make_masterfile(self, wd, iteration=None):
         with open(wd + '/master{}.obs'.format(self.name), 'w') as obsfile:
             obsfile.write('# {} X {} \n'.format(len(self.used_spectra) + 1, len(self.base)))
             master = [self.base]
-            if perturb_spectra:
+            if iteration and perturb_spectra:
                 data = self.perturb_spectra()
             else:
                 data = self.data
@@ -168,12 +159,12 @@ class Fd2gridLine:
                 obsfile.write(" ".join([str(num) for num in towrite[ii]]))
                 obsfile.write('\n')
 
-    def _run_fd2grid(self, wd):
+    def _run_fd3grid(self, wd):
         with open(wd + '/in{}'.format(self.name)) as inpipe, open(wd + '/out{}'.format(self.name), 'w') as outpipe:
-            sp.run(['./gridfd3'], stdin=inpipe, stdout=outpipe)
+            sp.run(['./fd3grid'], stdin=inpipe, stdout=outpipe)
 
     def _save_output(self, wd, iteration):
-        with open(wd + '/out{}'.format(self.name), 'r') as f:
+        with open(wd + '/out{}'.format(self.name)) as f:
             llines = f.readlines()
             llines.pop(0)
             kk1s = np.zeros(len(llines))
@@ -192,12 +183,12 @@ class Fd2gridLine:
         self.dof = len(self.used_spectra) * len(self.base)
 
 
-class Fd2gridThread(threading.Thread):
+class Fd3gridThread(threading.Thread):
 
-    def __init__(self, threadno, iterations, fd2gridlines: typing.List[Fd2gridLine]):
+    def __init__(self, threadno, iterations, fd2gridlines: typing.List[Fd3gridLine]):
         super().__init__()
         self.threadno = threadno
-        self.wd = fd2_folder + "/thread" + str(threadno)
+        self.wd = obj + "/thread" + str(threadno)
         self.fd2gridlines = fd2gridlines
         self.iterations = iterations
         self.threadtime = time.time()
@@ -231,50 +222,20 @@ class Fd2gridThread(threading.Thread):
             print('Exception occured when running gridfd3:', e)
 
 
-print('starting setup...')
-# obj = None
-# try:
-#     obj = sys.argv[1]
-# except IndexError:
-#     print('please give an object!')
-#     exit()
-#
+#######
+# input
 obj = 'LB-1/HERMES'
-
-if not os.path.isdir(obj):
-    os.mkdir(obj)
-
-fd2_folder = obj
-print('fd2_folder is {}'.format(fd2_folder))
-spec_folder = None
-try:
-    spec_folder = glob.glob('/Users/matthiasf/Data/Spectra/' + obj)[0]
-except IndexError:
-    print('no spectra folder of object found')
-    exit()
-
-print('spectroscopy folder is {}\n'.format(spec_folder))
-monte_carlo = True
-# try:
-#     monte_carlo = sys.argv[2] == 'True'
-# except IndexError:
-#     pass
-
-# all fits files in this directory
-allfiles = glob.glob(spec_folder + '/**/*.fits', recursive=True)
-number_of_files = len(allfiles)
-
-if number_of_files == 0:
-    print('no spectra found')
-    exit()
-
-# give geometric orbit
-k1str = '45 58 0.2'
+monte_carlo = False
+N = 3000
+dim = 1
+k1str = '52.94 52.94 0.01'
 k2str = '0.5 25 0.5'
-orbit = (78.7973, 58825.200, 0.0036, 179.2)  # p, t0, e, Omega(A)
-orbit_err = (0.0094, 0, 0.0021, 0)
+orbit = (78.7999, 2458845.5394 - 2400000.5, 0, 270)  # p, t0, e, omega(A)
+orbit_err = (0.0097, 0, 0, 0)
 perturb_orbit = True
 perturb_spectra = True
+thirdlight = False
+lfs = [0.6, 0.4]
 
 # enter ln(lambda/A) range and name of line
 lines = dict()
@@ -299,15 +260,36 @@ lines['Hbeta'] = (8.4860, 8.4920, 2e-5)
 lines['HeI5875'] = (8.6777, 8.6794, 2e-5)
 lines['Halpha'] = (8.7865, 8.7920, 2e-5)
 lines['HeI6678'] = (8.805, 8.8095, 2e-5)
+######
+
+print('starting setup...')
+if not os.path.isdir(obj):
+    os.mkdir(obj)
+spec_folder = None
+try:
+    spec_folder = glob.glob('/Users/matthiasf/Data/Spectra/' + obj)[0]
+except IndexError:
+    print('no spectra folder of object found')
+    exit()
+
+print('spectroscopy folder is {}\n'.format(spec_folder))
+
+# all fits files in this directory
+allfiles = glob.glob(spec_folder + '/**/*.fits', recursive=True)
+number_of_files = len(allfiles)
+
+if number_of_files == 0:
+    print('no spectra found')
+    exit()
+
 K = len(lines)
 fd2lines = list()
 print('building fd2gridline object for:')
 for line in lines.keys():
     print(' {}'.format(line))
-    fd2lines.append(Fd2gridLine(line, lines[line][0:2], lines[line][2]))
+    fd2lines.append(Fd3gridLine(line, lines[line][0:2], lines[line][2]))
 
 if monte_carlo:
-    N = 1000
     # create threads
     cpus = os.cpu_count()
     print('number of threads will be {}'.format(cpus))
@@ -316,9 +298,9 @@ if monte_carlo:
     remainder = int(N % cpus)
     threads = list()
     for i in range(remainder):
-        threads.append(Fd2gridThread(i + 1, atleast + 1, fd2lines))
+        threads.append(Fd3gridThread(i + 1, atleast + 1, fd2lines))
     for i in range(remainder, cpus):
-        threads.append(Fd2gridThread(i + 1, atleast, fd2lines))
+        threads.append(Fd3gridThread(i + 1, atleast, fd2lines))
 
     setuptime = time.time()
     print('setup took {}s\n'.format(setuptime - starttime))
@@ -336,22 +318,31 @@ else:
     print('setup took {}s\n'.format(setuptime - starttime))
     for fd2line in fd2lines:
         print('handling {} line'.format(fd2line.name))
-        fd2line.run(fd2_folder)
-#%%
+        fd2line.run(obj)
+# %%
 files = list()
 dof = sum(fd2line.dof for fd2line in fd2lines)
 for key in lines.keys():
-    files.append(glob.glob(fd2_folder + '/chisqs/chisq{}.npz'.format(key))[0])
+    files.append(glob.glob(obj + '/chisqs/chisq{}.npz'.format(key))[0])
 k1s, k2s, chisq = oa.file_analyser(files[0])
 for i in range(1, len(files)):
     k1shere, k2shere, chisqhere = oa.file_analyser(files[i])
     chisq += chisqhere
 fig = plt.figure()
-ax = oa.plot_contours(fig, k1s, k2s, chisq / dof)
-ax.set_title(r"$\chi^2_{\textrm{red}}$")
-ax.set_xlabel(r'$K_1(\si{\km\per\second})$')
-ax.set_ylabel(r'$K_2(\si{\km\per\second})$')
-oa.mark_minimum(ax, k1s, k2s, chisq, r'$\chi^2_\textrm{red,min}$')
-ax.legend(loc=2)
-plt.tight_layout()
-fig.savefig(fd2_folder + '/chisq.png', dpi=200)
+if dim == 2:
+    ax = oa.plot_contours(fig, k1s, k2s, chisq / dof)
+    ax.set_title(r"$\chi^2_{\textrm{red}}$")
+    ax.set_xlabel(r'$K_1(\si{\km\per\second})$')
+    ax.set_ylabel(r'$K_2(\si{\km\per\second})$')
+    oa.mark_minimum(ax, k1s, k2s, chisq, r'$\chi^2_\textrm{red,min}$')
+    ax.legend(loc=2)
+    plt.tight_layout()
+    fig.savefig('chisq.png', dpi=200)
+    print(np.argmin(chisq))
+else:
+    ax = oa.plot_oneDee(fig, k2s, chisq / dof)
+    ax.set_title(r"$\chi^2_{\textrm{red}}, K_1 = $" + " " + str(min(k1s)) + " " + r'$\si{\km\per\second}$')
+    ax.set_xlabel(r'$K_2(\si{\km\per\second})$')
+    plt.grid()
+    plt.tight_layout()
+    fig.savefig('chisq.png', dpi=200)

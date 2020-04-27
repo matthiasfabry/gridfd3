@@ -50,7 +50,7 @@ static char *mxfd3fmts=MX_FDBINARY_FORMAT;
 
 int main ( int argc, char *argv[] ) {
 
-    long i, i0, i1, ksw[3], j, k, vc, vlen;
+    long i, i0, i1, j, k, vc, vlen;
     double **masterobs, **obs, z0, z1;
     char obsfn[1024];
 
@@ -83,7 +83,7 @@ int main ( int argc, char *argv[] ) {
         int sw;
         GETINT(&sw);
         sw = sw ? 1 : 0;
-        if ( sw ) ksw[K++] = i;
+        if ( sw ) K++;
     }
 
     /* allocating memory */
@@ -148,7 +148,7 @@ int main ( int argc, char *argv[] ) {
 double meritfn ( double *opin, double rvA, double rvB ) {
 
     long j, k;
-    double op[TRIORB_NP], rv[3];
+    double op[TRIORB_NP+2], rv[3];
 
     op[ 0] = opin[ 0];
     op[ 1] = opin[ 1];
@@ -160,9 +160,9 @@ double meritfn ( double *opin, double rvA, double rvB ) {
     op[ 7] = opin[ 7];
     op[ 8] = opin[ 8];
     op[ 9] = opin[ 9] * (M_PI/180);
-    op[10] = opin[10] / rvstep;
-    op[11] = opin[11] / rvstep;
-    op[12] = opin[12] * (M_PI/180);
+    op[10] = rvA / rvstep;
+    op[11] = rvB / rvstep;
+    op[12] = opin[10] * (M_PI/180);
 
     for ( j = 0 ; j < M ; j++ ) {
         triorb_rv ( op, otimes[j], rv );

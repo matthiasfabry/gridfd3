@@ -30,6 +30,12 @@ def plot_contours(ffig, kk1s, kk2s, cchisq):
     return aax
 
 
+def plot_oneDee(ffig, kk2s, cchisq):
+    axx = ffig.add_subplot(111)
+    axx.plot(kk2s, cchisq)
+    return axx
+
+
 def plot_uncertainty(ffig, kk1s, kk2s, cchisq, dof):
     chisqmin = np.min(cchisq)
     aax = ffig.add_subplot(111)

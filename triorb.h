@@ -1,3 +1,3 @@
 int triorb_rv ( double *op, double t, double *rv );
-#define TRIORB_NP 13
+#define TRIORB_NP 11
 
