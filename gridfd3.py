@@ -10,23 +10,43 @@ import time
 import typing
 
 import astropy.io.fits as fits
-
+import matplotlib as mpl
 import numpy as np
 import scipy.interpolate as spint
 
 import outfile_analyser as oa
+mpl.use('pgf')
+pgf_with_latex = {                      # setup matplotlib to use latex for output
+    "pgf.texsystem": "pdflatex",        # change this if using xetex or lautex
+    "text.usetex": True,                # use LaTeX to write all text
+    "font.family": "serif",
+    "font.serif": [],                   # blank entries should cause plots
+    "font.sans-serif": [],              # to inherit fonts from the document
+    "font.monospace": [],
+    "axes.labelsize": 16,               # LaTeX default is 10pt font.
+    "font.size": 16,
+    "legend.fontsize": 8,               # Make the legend/label fonts
+    "xtick.labelsize": 12,               # a little smaller
+    "ytick.labelsize": 12,
+    "pgf.preamble": [
+        r"\usepackage[utf8x]{inputenc}",    # use utf8 fonts
+        r"\usepackage[T1]{fontenc}",        # plots will be generated
+        r"\usepackage{siunitx}"
+        ]                                   # using this preamble
+    }
 
+plt.rcParams.update(pgf_with_latex)
 #%%
 starttime = time.time()
 
 
 class Fd2gridLine:
 
-    def __init__(self, name, limits):
+    def __init__(self, name, limits, samp):
         self.name = name
         self.used_spectra = list()
         self.limits = limits
-        self.base = np.arange(limits[0] - 0.0001, limits[1] + 0.0001, 2e-5)
+        self.base = np.arange(limits[0] - 0.0001, limits[1] + 0.0001, samp)
         self.data = list()
         self.noises = list()
         self.mjds = list()
@@ -94,7 +114,7 @@ class Fd2gridLine:
             print(' making master file')
         self._make_masterfile(wd)
         if not iteration:
-            print(' running fd2grid')
+            print(' running gridfd3')
         self._run_fd2grid(wd)
         if not iteration:
             print(' saving output')
@@ -150,7 +170,7 @@ class Fd2gridLine:
 
     def _run_fd2grid(self, wd):
         with open(wd + '/in{}'.format(self.name)) as inpipe, open(wd + '/out{}'.format(self.name), 'w') as outpipe:
-            sp.run(['./fd2grid'], stdin=inpipe, stdout=outpipe)
+            sp.run(['./gridfd3'], stdin=inpipe, stdout=outpipe)
 
     def _save_output(self, wd, iteration):
         with open(wd + '/out{}'.format(self.name), 'r') as f:
@@ -200,7 +220,7 @@ class Fd2gridThread(threading.Thread):
         try:
             for ii in range(self.iterations):
                 # execute fd3gridline runs
-                print('Thread {} running fd2grid iteration {}...'.format(self.threadno, ii + 1))
+                print('Thread {} running gridfd3 iteration {}...'.format(self.threadno, ii + 1))
                 for ffd2line in self.fd2gridlines:
                     ffd2line.run(self.wd, ii + 1)
                 print('estimated time to completion of thread {}: {}h'.format(self.threadno,
@@ -208,7 +228,7 @@ class Fd2gridThread(threading.Thread):
                                                                                       self.iterations - ii - 1) / 3600))
                 self.threadtime = time.time()
         except Exception as e:
-            print('Exception occured when running fd2grid:', e)
+            print('Exception occured when running gridfd3:', e)
 
 
 print('starting setup...')
@@ -249,42 +269,42 @@ if number_of_files == 0:
     exit()
 
 # give geometric orbit
-k1str = '50 55 0.1'
+k1str = '45 58 0.2'
 k2str = '0.5 25 0.5'
 orbit = (78.7973, 58825.200, 0.0036, 179.2)  # p, t0, e, Omega(A)
-orbit_err = (0.0094, 1165.93, 0.0021, 180)
-perturb_orbit = False
+orbit_err = (0.0094, 0, 0.0021, 0)
+perturb_orbit = True
 perturb_spectra = True
 
 # enter ln(lambda/A) range and name of line
 lines = dict()
 # lines['Hzeta'] = (8.2630, 8.2685)
 # lines['Hepsilon'] = (8.2845, 8.2888)
-lines['HeI+II4026'] = (8.2990, 8.302)
-lines['Hdelta'] = (8.3170, 8.3215)
+lines['HeI+II4026'] = (8.2990, 8.302, 2e-5)
+lines['Hdelta'] = (8.3170, 8.3215, 2e-5)
 # lines['SiIV4116'] = (8.3215, 8.3238)
 # lines['HeII4200'] = (8.3412, 8.3444)
-lines['Hgamma'] = (8.3730, 8.3785)
-lines['HeI4471'] = (8.4047, 8.4064)
+lines['Hgamma'] = (8.3730, 8.3785, 2e-5)
+lines['HeI4471'] = (8.4047, 8.4064, 2e-5)
 # lines['HeII4541'] = (8.4195, 8.4226)
 # lines['NV4604+4620'] = (8.4338, 8.4390)
 # lines['HeII4686'] = (8.4510, 8.4534)
-lines['Hbeta'] = (8.4860, 8.4920)
+lines['Hbeta'] = (8.4860, 8.4920, 2e-5)
 # lines['HeII5411'] = (8.5940, 8.5986)
 # lines['OIII5592'] = (8.6281, 8.6300)
 # lines['CIII5696'] = (8.6466, 8.6482)
 # lines['FeII5780'] = (8.6617, 8.6627)
 # lines['CIV5801'] = (8.6652, 8.6667)
 # lines['CIV5812'] = (8.6668, 8.6685)
-lines['HeI5875'] = (8.6777, 8.6794)
-lines['Halpha'] = (8.7865, 8.7920)
-
+lines['HeI5875'] = (8.6777, 8.6794, 2e-5)
+lines['Halpha'] = (8.7865, 8.7920, 2e-5)
+lines['HeI6678'] = (8.805, 8.8095, 2e-5)
 K = len(lines)
 fd2lines = list()
 print('building fd2gridline object for:')
 for line in lines.keys():
     print(' {}'.format(line))
-    fd2lines.append(Fd2gridLine(line, lines[line]))
+    fd2lines.append(Fd2gridLine(line, lines[line][0:2], lines[line][2]))
 
 if monte_carlo:
     N = 1000
@@ -328,11 +348,10 @@ for i in range(1, len(files)):
     chisq += chisqhere
 fig = plt.figure()
 ax = oa.plot_contours(fig, k1s, k2s, chisq / dof)
-ax.set_title(r"$\chi^2_{red}$")
-ax.set_xlabel(r'$K_1(km/second)$')
-ax.set_ylabel(r'$K_2(km/second)$')
-oa.mark_minimum(ax, k1s, k2s, chisq)
+ax.set_title(r"$\chi^2_{\textrm{red}}$")
+ax.set_xlabel(r'$K_1(\si{\km\per\second})$')
+ax.set_ylabel(r'$K_2(\si{\km\per\second})$')
+oa.mark_minimum(ax, k1s, k2s, chisq, r'$\chi^2_\textrm{red,min}$')
 ax.legend(loc=2)
 plt.tight_layout()
-fig = plt.figure()
-axx = oa.plot_uncertainty(fig, k1s, k2s, chisq / dof, dof)
+fig.savefig(fd2_folder + '/chisq.png', dpi=200)

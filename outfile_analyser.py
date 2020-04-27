@@ -47,10 +47,10 @@ def get_minimum(kk1s, kk2s, cchisq):
     return mink1, mink2
 
 
-def mark_minimum(aax, kk1s, kk2s, cchisq):
+def mark_minimum(aax, kk1s, kk2s, cchisq, label):
     mink1, mink2 = get_minimum(kk1s, kk2s, cchisq)
     print(mink1, mink2)
-    aax.plot([mink1], [mink2], 'ro', ms=5, label=r'$\chi^2_{red,min}$')
+    aax.plot([mink1], [mink2], 'ro', ms=5, label=label)
     return mink1, mink2
 
 

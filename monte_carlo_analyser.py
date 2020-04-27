@@ -84,22 +84,27 @@ if k1s is None or k2s is None:
 
 mink1s = sorted(mink1s)
 mink2s = sorted(mink2s)
-
-k1q1 = mink1s[int(0.025*N)]
-k1q2 = mink1s[int(0.975*N)]
-k2q1 = mink2s[int(0.025*N)]
-k2q2 = mink2s[int(0.975*N)]
+np.save(folder+'/mink1s', mink1s)
+np.save(folder+'/mink2s', mink2s)
+k1q1 = mink1s[int(0.158*N)]
+k1q2 = mink1s[int(0.842*N)]
+k2q1 = mink2s[int(0.158*N)]
+k2q2 = mink2s[int(0.842*N)]
 
 plt.figure()
-plt.hist(mink1s, bins=len(range(int(min(mink1s)), int(max(mink1s)))), align='left', color='r', label=r'$K_1$')
-plt.hist(mink2s, bins=len(range(int(min(mink2s)), int(max(mink2s)))), align='left', color='b', label=r'$K_2$')
-plt.xlabel(r'$K (\si{\km\per\second})$')
+plt.hist(mink1s, bins=oa.uniques(mink1s), align='left', color='r')
+plt.xlabel(r'$K_1 (\si{\km\per\second})$')
 plt.ylabel(r'$N$')
-plt.legend()
 plt.tight_layout()
-plt.savefig(folder + '/hist{}.png'.format(filename), dpi=200)
+plt.savefig(folder + '/histk1{}.png'.format(filename), dpi=200)
+plt.figure()
+plt.hist(mink2s, bins=oa.uniques(mink2s), align='left', color='b')
+plt.xlabel(r'$K_2 (\si{\km\per\second})$')
+plt.ylabel(r'$N$')
+plt.tight_layout()
+plt.savefig(folder + '/histk2{}.png'.format(filename), dpi=200)
 
 print(np.average(mink1s), np.average(mink2s))
 print(np.std(mink1s), np.std(mink2s))
-print('k1 95% =', k1q1, k1q2)
-print('k2 95% =', k2q1, k2q2)
+print('k1 1sig =', k1q1, k1q2)
+print('k2 1sig =', k2q1, k2q2)

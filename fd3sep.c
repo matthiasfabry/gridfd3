@@ -1,7 +1,7 @@
 #include <math.h>
 #include <stdlib.h>
 
-#include "fd2sep.h"
+#include "fd3sep.h"
 /* #include "mxfuns.h" */
 
 #include <gsl/gsl_linalg.h>
@@ -13,7 +13,7 @@
 
 /*************************************************************************/
 
-double fd2sep ( long K, long M, long N, double **dftobs, double *sig,
+double fd3sep ( long K, long M, long N, double **dftobs, double *sig,
 		double **rvm, double **lfm ) {
 
 	long i, j, k, n;
