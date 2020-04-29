@@ -26,7 +26,7 @@ mink1s, mink2s = list(), list()
 k1s, k2s = None, None
 N = 3000
 threads = os.cpu_count()
-atleast = int(N / threads)qœ
+atleast = int(N / threads)
 remainder = int(N % threads)
 
 filename = 'LB-1'
