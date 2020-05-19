@@ -8,7 +8,6 @@ import numpy as np
 
 import modules.gridfd3classes as fd3classes
 
-# %%
 starttime = time.time()
 
 ######
@@ -18,8 +17,8 @@ fd3folder = 'HR_6819' + '/' + str(datetime.today().date()) + '_' + str(
 spectra_set = 'HR_6819/FEROS'
 monte_carlo = False
 N = 1000
-k1str = '50 75 0.5'
-k2str = '0 15 0.5'
+k1str = '63 63 1'
+k2str = '0 15 0.1'
 orbit = (40.0366, 58889.1, 0, 270)  # p, t0, e, Omega(A)
 orbit_err = (0.1, 0, 0.0, 0)
 
@@ -60,7 +59,7 @@ lines['FeII5316'] = (8.5777, 8.5794)
 # lines['HeI5875'] = (8.6775, 8.6795)
 # lines['Halpha'] = (8.7865, 8.7920)
 # lines['HeI6678'] = (8.8045, 8.8095)
-sampling = 8e-6
+sampling = 1e-5
 ######
 
 print('starting setup...')

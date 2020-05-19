@@ -112,70 +112,74 @@ if __name__ == "__main__":
     # lines['HeI5875'] = (8.6775, 8.6795)
     # lines['Halpha'] = (8.7865, 8.7920)
     # lines['HeI6678'] = (8.8045, 8.8095)
+    st = 'allFeII'
+
+    st = 'allFeII'
 
     for line in lines.keys():
-        st = line
         print('finding', line, '...')
         with open(glob.glob(folder + '/in{}'.format(line))[0]) as f:
             dof += int(f.readlines()[-1])
-        chisqfiles = list()
+    chisqfiles = list()
+    for line in lines.keys():
         chisqfiles.append(glob.glob(folder + '/chisqs/chisq{}.npz'.format(line))[0])
-        k1s, k2s, chisq = file_analyser(chisqfiles[0])
+    k1s, k2s, chisq = file_analyser(chisqfiles[0])
 
-        for i in range(1, len(chisqfiles)):
-            _, _, chisqhere = file_analyser(chisqfiles[i])
-            chisq += chisqhere
-        minima = get_minimum(k1s, k2s, chisq)
-        idx = get_min_idx(chisq)
-        print(minima)
+    for i in range(1, len(chisqfiles)):
+        _, _, chisqhere = file_analyser(chisqfiles[i])
+        chisq += chisqhere
+    minima = get_minimum(k1s, k2s, chisq)
+    idx = get_min_idx(chisq)
+    print(minima)
 
-        if len(uniques(k1s)) > 1:
-            dof -= 2
-            fig = plt.figure()
-            ax = plot_contours(fig, k1s, k2s, chisq, dof)
-            mark_minimum(ax, k1s, k2s, chisq, r"$\chi^2_{\textrm{red,min}}$")
-            ax.legend(loc=2)
-            ax.set_title(r"$\chi^2_{\textrm{red}}$")
-            ax.set_xlabel(r'$K_1(\si{\km\per\second})$')
-            ax.set_ylabel(r'$K_2(\si{\km\per\second})$')
-            plt.grid()
-            plt.tight_layout()
-            fig.savefig(folder + '/chisq{}.png'.format(st), dpi=200)
-            plt.close(fig)
-
-            fig = plt.figure()
-            ax = plot_uncertainty(fig, k1s, k2s, chisq, dof)
-            ax.set_title(r'$1-P(\nu/2, \chi^2/2)$')
-            ax.set_xlabel(r'$K_1(\si{\km\per\second})$')
-            ax.set_ylabel(r'$K_2(\si{\km\per\second})$')
-            plt.tight_layout()
-            fig.savefig(folder + '/error{}.png'.format(st), dpi=200)
-            plt.close(fig)
-
-            fig = plt.figure()
-            ax = plot_uncertainty_unscaled(fig, k1s, k2s, chisq, dof)
-            ax.set_title(r'$1-P(\nu/2, \chi^2/2)$')
-            ax.set_xlabel(r'$K_1(\si{\km\per\second})$')
-            ax.set_ylabel(r'$K_2(\si{\km\per\second})$')
-            plt.tight_layout()
-            fig.savefig(folder + '/errorunscaled{}.png'.format(st), dpi=200)
-            plt.close(fig)
-
-            fig = plt.figure()
-            ax = plot_oneDee(fig, k1s, chisq[:, idx[1]], dof)
-            ax.set_title(r"$\chi^2_{\textrm{red}}, K_2 = $" + " " + str(k2s[idx[1]]) + " " + r'$\si{\km\per\second}$')
-            ax.set_xlabel(r'$K_1(\si{\km\per\second})$')
-            plt.grid()
-            plt.tight_layout()
-            fig.savefig(folder + '/chisqmargk2{}.png'.format(st), dpi=200)
-            plt.close(fig)
-        else:
-            dof -= 1
+    if len(uniques(k1s)) > 1:
+        dof -= 2
         fig = plt.figure()
-        ax = plot_oneDee(fig, k2s, chisq[idx[0], :], dof)
-        ax.set_title(r"$\chi^2_{\textrm{red}}, K_1 = $" + " " + str(k1s[idx[0]]) + " " + r'$\si{\km\per\second}$')
-        ax.set_xlabel(r'$K_2(\si{\km\per\second})$')
+        ax = plot_contours(fig, k1s, k2s, chisq, dof)
+        mark_minimum(ax, k1s, k2s, chisq, r"$\chi^2_{\textrm{red,min}}$")
+        ax.legend(loc=2)
+        ax.set_title(r"$\chi^2_{\textrm{red}}$")
+        ax.set_xlabel(r'$K_1(\si{\km\per\second})$')
+        ax.set_ylabel(r'$K_2(\si{\km\per\second})$')
         plt.grid()
         plt.tight_layout()
-        fig.savefig(folder + '/chisqmargk1{}.png'.format(st), dpi=200)
+        fig.savefig(folder + '/chisq{}.png'.format(st), dpi=200)
         plt.close(fig)
+
+        fig = plt.figure()
+        ax = plot_uncertainty(fig, k1s, k2s, chisq, dof)
+        ax.set_title(r'$1-P(\nu/2, \chi^2/2)$')
+        ax.set_xlabel(r'$K_1(\si{\km\per\second})$')
+        ax.set_ylabel(r'$K_2(\si{\km\per\second})$')
+        plt.tight_layout()
+        fig.savefig(folder + '/error{}.png'.format(st), dpi=200)
+        plt.close(fig)
+
+        fig = plt.figure()
+        ax = plot_uncertainty_unscaled(fig, k1s, k2s, chisq, dof)
+        ax.set_title(r'$1-P(\nu/2, \chi^2/2)$')
+        ax.set_xlabel(r'$K_1(\si{\km\per\second})$')
+        ax.set_ylabel(r'$K_2(\si{\km\per\second})$')
+        plt.tight_layout()
+        fig.savefig(folder + '/errorunscaled{}.png'.format(st), dpi=200)
+        plt.close(fig)
+
+        fig = plt.figure()
+        ax = plot_oneDee(fig, k1s, chisq[:, idx[1]], dof)
+        ax.set_title(r"$\chi^2_{\textrm{red}}, K_2 = $" + " " + str(k2s[idx[1]]) + " " + r'$\si{\km\per\second}$')
+        ax.set_xlabel(r'$K_1(\si{\km\per\second})$')
+        plt.grid()
+        plt.tight_layout()
+        fig.savefig(folder + '/chisqmargk2{}.png'.format(st), dpi=200)
+        plt.close(fig)
+    else:
+        dof -= 1
+    fig = plt.figure()
+    ax = plot_oneDee(fig, k2s, chisq[idx[0], :], dof)
+    ax.set_title(r"$\chi^2_{\textrm{red}}, K_1 = $" + " " + str(k1s[idx[0]]) + " " + r'$\si{\km\per\second}$')
+    ax.set_xlabel(r'$K_2(\si{\km\per\second})$')
+    plt.grid()
+    plt.tight_layout()
+    fig.savefig(folder + '/chisqmargk1{}.png'.format(st), dpi=200)
+    plt.close(fig)
+

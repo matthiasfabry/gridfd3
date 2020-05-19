@@ -30,23 +30,28 @@ class Fd3gridLine:
         self.data = list()
         self.noises = list()
         self.mjds = list()
-        for j in range(len(spectra_files)):
-            with fits.open(spectra_files[j]) as hdul:
+        self.spectra = spectra_files
+        self.dof = 0
+
+    def set_spectra(self):
+        self.data = list()
+        for j in range(len(self.spectra)):
+            with fits.open(self.spectra[j]) as hdul:
                 try:
                     spec_hdu = hdul['NORM_SPECTRUM']
                 except KeyError:
-                    print(spectra_files[j], 'has no normalized spectrum, skipping')
+                    print(self.spectra[j], 'has no normalized spectrum, skipping')
                     continue
                 loglamb = spec_hdu.data['log_wave']
                 # check whether base is completely covered
                 if loglamb[0] >= self.base[0] or loglamb[-1] <= self.base[-1]:
-                    print(spectra_files[j], 'does not fully cover', self.name)
+                    print(self.spectra[j], 'does not fully cover', self.name)
                     continue
                 # check whether spline is present
                 try:
                     hdul['LOG_NORM_SPLINE']
                 except KeyError:
-                    print(spectra_files[j], 'has no log_norm_spline')
+                    print(self.spectra[j], 'has no log_norm_spline')
                     continue
                 # determine indices where the line resides
                 start = 0
@@ -58,22 +63,22 @@ class Fd3gridLine:
                     endline += 1
                 # check if start of noise estimation interval is not zero
                 if spec_hdu.data['norm_flux'][start] < 0.01:
-                    print(spectra_files[j], 'has low start of noise interval in line', self.name)
+                    print(self.spectra[j], 'has low start of noise interval in line', self.name)
                     continue
-                while loglamb[startline] < limits[0]:
+                while loglamb[startline] < self.limits[0]:
                     startline += 1
                     endline += 1
                 # check if end of noise estimation interval is not zero or if no data in the estimation interval
                 if spec_hdu.data['norm_flux'][startline] < 0.01 or start == startline:
-                    print(spectra_files[j], 'has low end of noise interval in line', self.name)
+                    print(self.spectra[j], 'has low end of noise interval in line', self.name)
                     continue
-                while loglamb[endline] < limits[1]:
+                while loglamb[endline] < self.limits[1]:
                     endline += 1
                 # check whether end of line is not in interorder spacing of spectrograph
                 if spec_hdu.data['norm_flux'][endline] < 0.01:
-                    print(spectra_files[j], 'has low end of data interval in line', self.name)
+                    print(self.spectra[j], 'has low end of data interval in line', self.name)
                     continue
-                self.used_spectra.append(spectra_files[j])
+                self.used_spectra.append(self.spectra[j])
                 # append in base evaluated flux values
                 evals = spint.splev(self.base, hdul['log_NORM_SPLINE'].data[0])
                 self.data.append(evals)
@@ -87,6 +92,8 @@ class Fd3gridLine:
         print(' this line uses {} spectra'.format(len(self.used_spectra)))
 
     def run(self, wd, iteration: int = None):
+        if not iteration or iteration == 1:
+            self.set_spectra()
         if not iteration:
             print(' making in file for {}'.format(repr(self)))
         self._make_infile(wd)
