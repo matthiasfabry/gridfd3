@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 import outfile_analyser as oa
 # noinspection PyUnresolvedReferences
 import plotsetup
-
-folders = ['LB-1/HERMES']
+import scipy.stats as stat
+folders = ['9_Sgr/first', '9_Sgr/second', '9_Sgr/third']
 
 mink1s = np.array([])
 mink2s = np.array([])
@@ -24,16 +24,26 @@ k1q2 = mink1s[int(0.842*N)]
 k2q1 = mink2s[int(0.158*N)]
 k2q2 = mink2s[int(0.842*N)]
 uk1s = oa.uniques(mink1s)
+uk2s = oa.uniques(mink2s)
 if len(uk1s) != 1:
     plt.figure()
-    plt.hist(np.round(mink1s, 2), bins=uk1s, align='left', color='r')
+    plt.hist(np.round(mink1s, 2), bins=uk1s, align='left', color='b')
     plt.xlabel(r'$K_1 (\si{\km\per\second})$')
     plt.ylabel(r'$N$')
     plt.grid()
     plt.tight_layout()
     plt.savefig('histk1.png', dpi=200)
+    plt.figure()
+    plt.hist(np.round(mink1s, 2), bins=uk1s, align='left', color='b', label=r'$K_1$')
+    plt.hist(np.round(mink2s, 2), bins=uk2s, align='left', color='r', label=r'$K_2$')
+    plt.grid()
+    plt.legend()
+    plt.xlabel(r'$K (\si{\km\per\second})$')
+    plt.ylabel(r'$N$')
+    plt.tight_layout()
+    plt.savefig('histk1k2.png', dpi=200)
 plt.figure()
-plt.hist(mink2s, bins=oa.uniques(mink2s), align='left', color='b')
+plt.hist(np.round(mink2s, 2), bins=uk2s, align='left', color='r')
 plt.xlabel(r'$K_2 (\si{\km\per\second})$')
 plt.ylabel(r'$N$')
 plt.grid()
@@ -41,6 +51,7 @@ plt.tight_layout()
 plt.savefig('histk2.png', dpi=200)
 
 print(np.average(mink1s), np.average(mink2s))
+print(stat.mode(mink1s), stat.mode(mink2s))
 print(np.std(mink1s), np.std(mink2s))
 print('k1 1sig =', k1q1, k1q2)
 print('k2 1sig =', k2q1, k2q2)

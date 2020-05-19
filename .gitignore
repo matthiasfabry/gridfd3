@@ -1,10 +1,11 @@
 temp
+*.pyc
 .project
 .cproject
 .DS_Store
-.idea/*
+.idea/
 .settings
-9_Sgr/**
-LB-1/**
+9_Sgr/
+LB-1/
+HR_6819*
 
-*.pyc
