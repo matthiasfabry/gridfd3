@@ -12,7 +12,7 @@
 #include <gsl/gsl_rng.h>
 #include <gsl/gsl_multimin.h>
 
-#include "mxfuns.h"
+#include "../mxfuns.h"
 #include "fd3sep.h"
 #include "triorb.h"
 

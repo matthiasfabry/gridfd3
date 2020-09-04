@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 
-#include "kepler.h"
+#include "../kepler.h"
 #include "triorb.h"
 
 #define LITESPEED 2.998E05
