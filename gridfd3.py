@@ -4,103 +4,114 @@ import pathlib
 import time
 from datetime import datetime
 
-import numpy as np
-
 import modules.gridfd3classes as fd3classes
 
-starttime = time.time()
-
-######
 # input
-fd3folder = 'HR_6819' + '/' + str(datetime.today().date()) + '_' + str(
-    datetime.today().time().hour) + str(datetime.today().time().minute)
-spectra_set = 'HR_6819/FEROS'
-monte_carlo = False
-N = 1000
-k1str = '63 63 1'
-k2str = '0 15 0.1'
-orbit = (40.0366, 58889.1, 0, 270)  # p, t0, e, Omega(A)
-orbit_err = (0.1, 0, 0.0, 0)
-
-perturb_orbit = True
-perturb_spectra = True
-thirdlight = False
-lfs = [0.5, 0.5]
-
-# enter ln(lambda/A) range and name of line
-lines = dict()
-# lines['Heta'] = (8.249, 8.2545)
-# lines['Hzeta'] = (8.263, 8.2685)
-# lines['FeI3923'] = (8.273, 8.2765)
-# lines['HeI+II4026'] = (8.2985, 8.3025)
-# lines['Hdelta'] = (8.3155, 8.3215)
-# lines['SiIV4116'] = (8.3215, 8.3238)
-# lines['HeI4143'] = (8.3280, 8.3305)
-# lines['HeII4200'] = (8.3410, 8.3445)
-# lines['Hgamma'] = (8.3720, 8.3785)
-# lines['NIII4379'] = (8.3835, 8.3857)
-# lines['HeI4387'] = (8.3855, 8.3875)
-# lines['HeI4471'] = (8.4045, 8.4065)
-# lines['HeII4541'] = (8.4190, 8.4230)
-lines['FeII4584'] = (8.4292, 8.4316)
-# lines['HeII4686'] = (8.4510, 8.4535)
-# lines['HeI4713'] = (8.4575, 8.4590)
-# lines['Hbeta'] = (8.4850, 8.4925)
-# lines['HeI5016'] = (8.5195, 8.5215)
-lines['FeII5167'] = (8.5494, 8.5514)
-lines['FeII5198'] = (8.5549, 8.5568)
-lines['FeII5233'] = (8.5620, 8.5640)
-lines['FeII5276'] = (8.5699, 8.5717)
-lines['FeII5316'] = (8.5777, 8.5794)
-# lines['HeII5411'] = (8.5935, 8.5990)
-# lines['FeII5780'] = (8.6617, 8.6629)
-# lines['CIV5801'] = (8.6652, 8.6667)
-# lines['CIV5812'] = (8.6668, 8.6685)
-# lines['HeI5875'] = (8.6775, 8.6795)
-# lines['Halpha'] = (8.7865, 8.7920)
-# lines['HeI6678'] = (8.8045, 8.8095)
-sampling = 1e-5
-######
-
-print('starting setup...')
-
-print('orbit is:', orbit)
-print('lightfactors are:', lfs)
-
-pathlib.Path(fd3folder).mkdir(parents=True, exist_ok=True)
-spec_folder = None
+obj = '9_Sgr'  # folder name for your run, can be anything you want
+spectra_set = ['9_Sgr']  # allows for subsetting spectra
 try:
-    spec_folder = glob.glob('/Users/matthiasf/data/spectra/' + spectra_set)[0]
+    spec_folder = list()
+    for folder in spectra_set:
+        spec_folder.append(glob.glob('/Users/matthiasf/data/spectra/' +
+                                     folder)[0])  # actual path to your folder containing spectra
 except IndexError:
+    spec_folder = None
     print('no spectra folder of object found')
     exit()
 
+
+# K1 and K2 ranges to be explored, in string form: 'left right step', all in km/s
+k1str = '15 45 1'
+k2str = '40 65 1'
+
+# Indicate if you want the model spectra to be computed
+back = False
+
+# geometrical orbit elements and its error. error is ignored if not monte_carlo
+orbit = (3261, 56547, 0.648, 30.7)  # p, t0, e, Omega(A)
+orbit_err = (69, 12, 0.009, 2.3)
+
+# monte carlo switches. If monte_carlo, at least one of the others needs to be true.
+# If not monte_carlo, the others are ignored
+monte_carlo = False
+N = 1000
+perturb_orbit = True
+perturb_spectra = True
+
+# do you want a (static) third component to be found?
+thirdlight = False
+
+# lightfactors of your components (if thirdlight, give three)
+lfs = [0.6173, 0.3827]
+
+# sampling of your spectra in log space
+sampling = 2.e-6
+
+# enter wavelength range(s) in natural log of wavelength and give name of line. Must be a dict.
+lines = dict()
+# lines['HeI4009'] = (4002, 4016)
+# lines['HeI+II4026'] = (4018, 4033)
+lines['Hdelta'] = (4086.7, 4111.3)
+# lines['HeI4121'] = (4117, 4125)
+# lines['HeI4143'] = (4135, 4149)
+lines['HeII4200'] = (4192.3, 4207.0)
+lines['Hgamma'] = (4324.2, 4352.5)
+# lines['HeI4387'] = (4377, 4398)
+# lines['HeI4471'] = (4465, 4477)
+# lines['FeII4584'] = (4578, 4589)
+lines['HeII4541'] = (4532.4, 4550.5)
+lines['HeII4686'] = (4679.7, 4691.4)
+# lines['HeI4713'] = (4707, 4720)
+lines['Hbeta'] = (4841.6, 4878.0)
+# lines['FeII5167'] = (5162, 5175)
+# lines['FeII5198'] = (5190, 5205)
+# lines['FeII5233'] = (5225, 5238)
+# lines['FeII5276'] = (5270, 5282)
+# lines['FeII5316+SII5320'] = (5310, 5325)
+# lines['FeII5362'] = (5356, 5368)
+lines['HeII5411'] = (5396.4, 5426.2)
+# lines['OIII5592'] = (5584, 5600)
+# lines['CIII5696'] = (5680, 5712)
+# lines['FeII5780'] = (5770, 5790)
+# lines['CIV5801+12'] = (5798, 5817)
+lines['HeI5875'] = (5869.4, 5881.1)
+# lines['Halpha'] = (6545, 6580)
+# lines['HeI6678'] = (6674, 6682)
+# lines['OI8446'] = (8437, 8455)
+
+############################################################
+
+starttime = time.time()
+print('starting setup...')
+print('orbit is:', orbit)
+print('lightfactors are:', lfs)
 print('spectroscopy folder is {}\n'.format(spec_folder))
 
 # all fits files in this directory
-allfiles = glob.glob(spec_folder + '/**/*.fits', recursive=True)
-number_of_files = len(allfiles)
+allfiles = list()
+for folder in spec_folder:
+    allfiles.extend(glob.glob(folder + '/**/*.fits', recursive=True))
 
-if number_of_files == 0:
+if len(allfiles) == 0:
     print('no spectra found')
     exit()
-
-with open(fd3folder + "/params.txt", 'w') as paramfile:
-    paramfile.write(str(orbit) + '\n')
-    paramfile.write(str(orbit_err) + '\n')
-    paramfile.write(str(lfs) + '\n')
-    paramfile.write(str(sampling))
-# noinspection PyTypeChecker
-np.savetxt(fd3folder + '/orbit.txt', np.array(orbit))
-# noinspection PyTypeChecker
-np.savetxt(fd3folder + '/orbiterr.txt', np.array(orbit_err))
-# noinspection PyTypeChecker
-np.savetxt(fd3folder + '/lightfactors.txt', np.array(lfs))
-
 K = len(lines)
 if K == 0:
     print('no lines selected')
     exit()
+
+fd3folder = obj + '/' + str(datetime.today().strftime('%y%m%dT%H%M%S'))
+pathlib.Path(fd3folder).mkdir(parents=True, exist_ok=True)
+
+# save the run parameters for later reference
+with open(fd3folder + "/params.txt", 'w') as paramfile:
+    paramfile.write('orbit\t' + str(orbit) + '\n')
+    paramfile.write('orbit_err\t' + str(orbit_err) + '\n')
+    paramfile.write('lightfactors\t' + str(lfs) + '\n')
+    paramfile.write('sampling\t' + str(sampling) + '\n')
+    paramfile.write('k1s\t' + k1str + '\n')
+    paramfile.write('k2s\t' + k2str + '\n')
+    paramfile.write('spectra\t' + str(spectra_set) + '\n')
 
 cpus = os.cpu_count()
 fd3lines = list()
@@ -108,8 +119,8 @@ print('building fd3gridline object for:')
 for line in lines.keys():
     print(' {}'.format(line))
     fd3lines.append(
-        fd3classes.Fd3gridLine(line, lines[line][0:2], sampling, allfiles, monte_carlo, thirdlight, lfs, orbit,
-                               orbit_err, perturb_orbit, perturb_spectra, k1str, k2str))
+        fd3classes.Fd3gridLine(line, lines[line], sampling, allfiles, monte_carlo, thirdlight, lfs, orbit,
+                               orbit_err, perturb_orbit, perturb_spectra, k1str, k2str, back))
 
 threads = list()
 if monte_carlo:
@@ -133,7 +144,10 @@ print('setup took {}s\n'.format(setuptime - starttime))
 
 print('starting runs!')
 for thread in threads:
-    thread.start()
+    try:
+        thread.start()
+    except fd3classes.Fd3Exception as e:
+        print(e)
 
 for thread in threads:
     thread.join()

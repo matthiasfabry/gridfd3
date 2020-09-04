@@ -1,12 +1,9 @@
 
-all: fd3grid
+all : clean gridfd3
 
 clean :
-	rm fd3grid *.o
+	rm -f ./bin/* ./src/*.o
 
-fd3grid : fd3grid.o fd3sep.o triorb.o kepler.o mxfuns.o
-	${CC} -Wall fd3grid.o fd3sep.o triorb.o kepler.o mxfuns.o \
-	    -lgsl -lgslcblas -lm -o $@
-
-.c.o :
-	${CC} -Wall -c $<
+gridfd3 : src/fd3grid.o src/fd3sep.o src/triorb.o src/kepler.o src/mxfuns.o
+	${CC} -Wall src/fd3grid.o src/fd3sep.o src/triorb.o src/kepler.o src/mxfuns.o \
+	-lgsl -lgslcblas -lm -o bin/$@

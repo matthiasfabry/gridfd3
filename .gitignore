@@ -7,5 +7,6 @@ temp
 .settings
 9_Sgr/
 LB-1/
+bin/
 HR_6819*
-
+**.o

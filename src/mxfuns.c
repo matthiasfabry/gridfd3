@@ -1,4 +1,3 @@
-
 /*
  *  module mxfuns by Sasa Ilijic, silijic@geof.hr, 2000, 2001, 2002
  *
@@ -8,11 +7,11 @@
  *
  */
 
-#include<stdlib.h>
-#include<stdio.h>
-#include<string.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 
-#include"mxfuns.h"
+#include "mxfuns.h"
 
 static char *mxerrs="MxCaller", *mxerr1="MxFunction", mxerr2[256];
 static FILE *mxlogfp = NULL;
@@ -253,3 +252,4 @@ void MxCopy( double **from, double **to, long vc, long vlen ) {
             *(*(to+j)+i) = *(*(from+j)+i);
 
 }
+

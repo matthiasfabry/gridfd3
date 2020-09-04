@@ -38,10 +38,10 @@ void fdbfailure(void) { exit ( EXIT_FAILURE ); }
 /*****************************************************************************/
 
 static long   K, M, N, Ndft, nfp;
-static double **dftobs;
+static double **dftobs, **dftmod;
 static double rvstep, *otimes, *rvcorr, *sig, **lfm, **rvm;
 static double op0[TRIORB_NP];
-static double meritfn ( double *op , double rvA, double rvB);
+static double meritfn ( double *op, double rvA, double rvB, int backswitch);
 
 #define MX_FDBINARY_FORMAT "%15.8E   "
 static char *mxfd3fmts=MX_FDBINARY_FORMAT;
@@ -50,16 +50,20 @@ static char *mxfd3fmts=MX_FDBINARY_FORMAT;
 
 int main ( int argc, char *argv[] ) {
 
-    long i, i0, i1, j, k, vc, vlen;
-    double **masterobs, **obs, z0, z1;
-    char obsfn[1024];
+    long i, i0, i1, j, k, vc, vlen, rootfnlen;
+    double **masterobs, **obs, z0, z1, **mod, *rvAs, *rvBs, **chi2, lowA, highA, lowB, highB, stepA, stepB;
+    char rootfn[1024], obsfn[1024], modfn[1024], rvsfn[1024];
+    int backswitch, sampA, sampB;
 
     setbuf ( stdout, NULL );
     MxError( FDBErrorString, stdout, fdbfailure );
     MxFormat( mxfd3fmts );
-    GETSTR ( obsfn );
+    GETSTR ( rootfn );
+    rootfnlen = strlen ( rootfn );
     vc=0;
     vlen=0;
+    sprintf ( obsfn, "%s", rootfn ); sprintf ( obsfn+rootfnlen, "%s", ".obs" );
+    sprintf ( rvsfn, "%s", rootfn ); sprintf ( rvsfn+rootfnlen, "%s", ".rvs" );
     masterobs = MxLoad ( obsfn, &vc, &vlen );
     M = vc - 1;
     z0 = **masterobs;
@@ -67,6 +71,7 @@ int main ( int argc, char *argv[] ) {
     rvstep = SPEEDOFLIGHT * ( - 1 + exp ((z1-z0)/(vlen-1)) );
     GETDBL ( &z0 );
     GETDBL ( &z1 );
+    GETINT ( &backswitch );
     i0 = 0;
     while ( *(*masterobs+i0) < z0 )
         i0++;
@@ -83,29 +88,32 @@ int main ( int argc, char *argv[] ) {
         int sw;
         GETINT(&sw);
         sw = sw ? 1 : 0;
-        if ( sw ) K++;
+        if ( sw )
+            K++;
     }
 
-    /* allocating memory */
     Ndft = 2*(N/2 + 1);
+    /* allocating memory */
     dftobs = MxAlloc ( M, Ndft );
-    dft_fwd ( M, N, obs+1, dftobs );
+    mod = MxAlloc ( K+1, N );
+    dftmod = MxAlloc ( K, Ndft );
     otimes = *MxAlloc ( 1, M );
     rvcorr = *MxAlloc ( 1, M );
     sig = *MxAlloc ( 1, M );
     rvm = MxAlloc ( K, M );
     lfm = MxAlloc ( K, M );
+    /* transform to fourier space */
+    dft_fwd ( M, N, obs+1, dftobs );
     for ( j = 0 ; j < M ; j++ ) {
         GETDBL(otimes+j);
         GETDBL(rvcorr+j);
         GETDBL(sig+j);
-        for ( k = 0; k < K ; k++ ) GETDBL(*(lfm+k)+j);
+        for ( k = 0; k < K ; k++ )
+            GETDBL(*(lfm+k)+j);
     }
 
-    for ( nfp = i = 0 ; i < TRIORB_NP ; i++ ) GETDBL(op0+i);
-
-    double lowA, highA, lowB, highB;
-    double stepA, stepB;
+    for ( nfp = i = 0 ; i < TRIORB_NP ; i++ )
+        GETDBL(op0+i);
 
     GETDBL(&lowA);
     GETDBL(&highA);
@@ -113,10 +121,6 @@ int main ( int argc, char *argv[] ) {
     GETDBL(&lowB);
     GETDBL(&highB);
     GETDBL(&stepB);
-
-    int sampA, sampB;
-    double *rvAs, *rvBs;
-    double **chi2;
 
     sampA = (highA - lowA) / stepA + 1;
     sampB = (highB - lowB) / stepB + 1;
@@ -135,17 +139,23 @@ int main ( int argc, char *argv[] ) {
     printf ( "k1 k2 chisq \n" );
     for (i=0; i<sampA; i++){
         for (j=0; j<sampB; j++){
-            *(*(chi2+i)+j) = meritfn ( op0 , *(rvAs+i), *(rvBs+j));
+            *(*(chi2+i)+j) = meritfn ( op0 , *(rvAs+i), *(rvBs+j), backswitch);
             printf ( "%.5f %.5f %.5f\n", *(rvAs+i), *(rvBs+j), *(*(chi2+i)+j));
+            MxWrite( rvm, K, M, rvsfn );
+            if ( backswitch ){
+                dft_bck ( K, N, dftmod, mod+1 );
+                sprintf ( modfn, "%s", rootfn );
+                sprintf( modfn+rootfnlen, "%.3f_%.3f.mod", *(rvAs+i), *(rvBs+j));
+                MxWrite ( mod, K+1, N, modfn);
+            }
         }
     }
-
     return EXIT_SUCCESS;
 }
 
 /*****************************************************************************/
 
-double meritfn ( double *opin, double rvA, double rvB ) {
+double meritfn ( double *opin, double rvA, double rvB, int backswitch) {
 
     long j, k;
     double op[TRIORB_NP+2], rv[3];
@@ -170,7 +180,7 @@ double meritfn ( double *opin, double rvA, double rvB ) {
             *(*(rvm+k)+j) = rv[k] + *(rvcorr+j) / rvstep;
     }
 
-    return fd3sep ( K, M, N, dftobs, sig, rvm, lfm);
+    return fd3sep ( K, M, N, dftobs, sig, rvm, lfm, dftmod, backswitch);
 }
 
 /*****************************************************************************/

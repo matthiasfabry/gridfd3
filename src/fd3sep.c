@@ -2,7 +2,6 @@
 #include <stdlib.h>
 
 #include "fd3sep.h"
-/* #include "mxfuns.h" */
 
 #include <gsl/gsl_linalg.h>
 #include <gsl/gsl_matrix.h>
@@ -14,7 +13,7 @@
 /*************************************************************************/
 
 double fd3sep ( long K, long M, long N, double **dftobs, double *sig,
-		double **rvm, double **lfm ) {
+		double **rvm, double **lfm, double **dftmod, int back ) {
 
 	long i, j, k, n;
 	double s2;
@@ -73,17 +72,25 @@ double fd3sep ( long K, long M, long N, double **dftobs, double *sig,
 
 		/* compute s2 */
 
-		for ( j = 0 ; j < M ; j++ ) for ( i = 0 ; i < 2 ; i++ ) {
+		for ( j = 0 ; j < M ; j++ )
+		    for ( i = 0 ; i < 2 ; i++ ) {
 
-			double bc, db;
+                double bc, db;
 
-			for ( bc = k = 0 ; k < K ; k++ ) {
-				bc += gsl_matrix_get( A, 2*j+i, 2*k   ) * gsl_vector_get( x, 2*k   );
-				bc += gsl_matrix_get( A, 2*j+i, 2*k+1 ) * gsl_vector_get( x, 2*k+1 );
-			}
-			db = gsl_vector_get ( b, 2*j+i ) - bc;
-			s2 += db * db * ( n % ((N+1)/2) ? 2 : 1 );
-		}
+                for ( bc = k = 0 ; k < K ; k++ ) {
+                    bc += gsl_matrix_get( A, 2*j+i, 2*k   ) * gsl_vector_get( x, 2*k   );
+                    bc += gsl_matrix_get( A, 2*j+i, 2*k+1 ) * gsl_vector_get( x, 2*k+1 );
+                }
+                db = gsl_vector_get ( b, 2*j+i ) - bc;
+                s2 += db * db * ( n % ((N+1)/2) ? 2 : 1 );
+            }
+        if (back){
+            /* copy to output */
+            for ( k = 0 ; k < K ; k++ ) {
+                *(*(dftmod+k)+2*n  ) = gsl_vector_get ( x, 2*k   );
+                *(*(dftmod+k)+2*n+1) = gsl_vector_get ( x, 2*k+1 );
+            }
+        }
 	}
 
 	/* close */
@@ -127,3 +134,23 @@ void dft_fwd ( long m, long n, double **mxin, double **mxout ) {
 
 /*************************************************************************/
 
+void dft_bck ( long m, long n, double **mxin, double **mxout ) {
+
+   long i, j;
+   double a = 1.0 / sqrt(n);
+   gsl_fft_halfcomplex_wavetable * dft_hcwt;
+   gsl_fft_real_workspace * dft_rews;
+
+   dft_hcwt = gsl_fft_halfcomplex_wavetable_alloc (n);
+   dft_rews = gsl_fft_real_workspace_alloc (n);
+
+   for ( j = 0 ; j < m ; j++ ) {
+      *(*(mxout+j)+0) = *(*(mxin+j)+0) / a;
+      for ( i = 1; i < n; i++ ) *(*(mxout+j)+i) = *(*(mxin+j)+i+1) / a;
+      gsl_fft_halfcomplex_inverse ( *(mxout+j), 1, n, dft_hcwt, dft_rews );
+   }
+
+   gsl_fft_halfcomplex_wavetable_free ( dft_hcwt );
+   gsl_fft_real_workspace_free ( dft_rews );
+
+}

@@ -1,44 +1,53 @@
 import numpy as np
+import scipy.optimize as spopt
 import scipy.special as sps
 
 
-def uniques(lst):
-    uniquelist = list()
-    for item in lst:
-        if item in uniquelist:
-            continue
-        uniquelist.append(item)
-    return uniquelist
-
-
-def file_analyser(ffile):
+def file_parser(ffile):
+    """
+    parses a gridfd3 output file
+    :param ffile: file to parse
+    :return: the unique k1s, k2s and a chisq matrix corresponding to those k1, k2s.
+    """
     ffile = np.load(ffile)
     kk1s = ffile['k1s']
-    kk1s = uniques(kk1s)
+    kk1s = np.unique(kk1s)
     kk2s = ffile['k2s']
-    kk2s = uniques(kk2s)
+    kk2s = np.unique(kk2s)
     cchisqhere = ffile['chisq']
     cchisqhere = cchisqhere.reshape((len(kk1s), len(kk2s)))
     return kk1s, kk2s, cchisqhere
 
 
 def plot_contours(ffig, kk1s, kk2s, cchisq, ddof):
+    """
+    plots the reduced chisq contours on a figure
+    :param ffig: figure to plot on
+    :param kk1s: k1 axis
+    :param kk2s: k2 axis
+    :param cchisq: chisquares
+    :param ddof: degrees of freedom
+    :return: plt axis object which is plotted
+    """
     aax = ffig.add_subplot(111)
     k2grid, k1grid = np.meshgrid(kk2s, kk1s)
-    contour = aax.contourf(k1grid, k2grid, cchisq / ddof, levels=15, cmap='inferno')
+    contour = aax.contourf(k1grid, k2grid, cchisq / ddof, levels=50, cmap='inferno')
     ffig.colorbar(contour, ax=aax)
     return aax
 
 
-def plot_oneDee(ffig, kk2s, cchisq, ddof):
-    axx = ffig.add_subplot(111)
-    axx.plot(kk2s, cchisq / ddof)
-    return axx
-
-
 def plot_uncertainty(ffig, kk1s, kk2s, cchisq, ddof):
-    factor = np.min(cchisq) / ddof
+    """
+    plot the 2D uncertainty contour
+    :param ffig: figure to plot on
+    :param kk1s: k1 axis
+    :param kk2s: k2 axis
+    :param cchisq: chisq grid
+    :param ddof: degrees of freedom
+    :return: plt axis object which is plotted
+    """
     aax = ffig.add_subplot(111)
+    factor = np.min(cchisq) / ddof
     p = 1 - sps.gammainc(ddof / 2, (cchisq / factor) / 2)
     k2grid, k1grid = np.meshgrid(kk2s, kk1s)
     contour = aax.contourf(k1grid, k2grid, p, cmap='inferno')
@@ -46,30 +55,169 @@ def plot_uncertainty(ffig, kk1s, kk2s, cchisq, ddof):
     return aax
 
 
-def plot_uncertainty_unscaled(ffig, kk1s, kk2s, cchisq, ddof):
-    aax = ffig.add_subplot(111)
-    p = 1 - sps.gammainc(ddof / 2, cchisq / 2)
-    k2grid, k1grid = np.meshgrid(kk2s, kk1s)
-    contour = aax.contourf(k1grid, k2grid, p, cmap='inferno')
-    ffig.colorbar(contour, ax=aax)
-    return aax
+def plot_oneDee(ffig, ks, cchisq, ddof, num):
+    """
+    plots a 1D slice of the chisq grid
+    :param ffig: figure to plot on
+    :param ks: k axis
+    :param cchisq: chisq values corresponding to the ks provided
+    :param ddof: degrees of freedom
+    :param num: give 1 or 2: is this K1 or 2?
+    :return: plt axis object which is plotted
+    """
+    axx = ffig.add_subplot(111)
+    axx.plot(ks, cchisq / ddof)
+    minimum = ks[np.argmin(cchisq)]
+    onesigma, plus, mins = oneDee_sigma(ks, cchisq, ddof)
+    try:
+        axx.hlines(onesigma / ddof, ks[0], ks[-1], colors='r')
+        axx.text(np.min(ks), (np.max(cchisq) + np.min(cchisq)) / ddof / 2,
+                 r'$K_{} = {}^{{+ {}}}_{{- {}}}$'.format(num, minimum, np.round(plus - minimum, 2),
+                                                         np.round(minimum - mins, 2)))
+    except TypeError as e:
+        print(e, 'cannot plot errors if they dont exist')
+        axx.text(np.min(ks), (np.max(chisq) + np.min(chisq)) / ddof / 2,
+                 'error outside grid')
+    return axx
+
+
+def oneDee_sigma(ks, cchisq, ddof):
+    """
+    finds the minimum of a chisq slice and the 1 sigma errors
+    :param ks: k axis
+    :param cchisq: corresponding chisq values
+    :param ddof: degrees of freedom
+    :return: minimal chisq, 1sigma chisq value, upper error, lower error
+    """
+    minn = np.min(cchisq)
+    factor = minn / ddof
+
+    def onesigma(ccchisq):
+        """
+        defines the one sigma level
+        :param ccchisq: chisqs
+        :return: 1sig level chisq
+        """
+        return 0.68 - sps.gammainc(ddof / 2, (ccchisq / factor) / 2)
+
+    try:
+        ones = spopt.root_scalar(onesigma, x0=np.min(cchisq), bracket=[np.min(cchisq), np.max(cchisq)]).root
+        ii = len(ks) - 1
+        while cchisq[ii] > ones:
+            ii -= 1
+        plus = ks[ii + 1] if ii != len(ks) - 1 else ks[-1]
+        ii = 0
+        while cchisq[ii] > ones:
+            ii += 1
+        mins = ks[ii - 1] if ii != 0 else ks[0]
+    except ValueError as e:
+        print(e, 'no root found in root_scalar')
+        ones, plus, mins = None, None, None
+    return ones, plus, mins
 
 
 def get_minimum(kk1s, kk2s, cchisq):
+    """
+    finds the minimal k1 and k2 of this chisq grid
+    :param kk1s: k1 axis
+    :param kk2s: k2 axis
+    :param cchisq: chisq grid
+    :return: k1, k2 for which chisq is minimal
+    """
     iidx = list(np.unravel_index(np.argmin(cchisq), cchisq.shape))
     mink1 = kk1s[iidx[0]]
     mink2 = kk2s[iidx[1]]
     return mink1, mink2
 
 
-def get_min_idx(cchisq) -> np.ndarray:
-    return np.array(np.unravel_index(np.argmin(cchisq), cchisq.shape))
+def get_min_idx(cchisq):
+    """
+    finds the indices of the minimal chisq value
+    :param cchisq: chisq grid
+    :return: array of indices
+    """
+    return np.unravel_index(np.argmin(cchisq), cchisq.shape)
 
 
 def mark_minimum(aax, kk1s, kk2s, cchisq, label):
+    """
+    marks the minimum chisq value on this axis
+    :param aax: axis object to plot on
+    :param kk1s: k1 axis
+    :param kk2s: k2 axis
+    :param cchisq: chisq grid
+    :param label: a label to add to the legend
+    """
     mink1, mink2 = get_minimum(kk1s, kk2s, cchisq)
     aax.plot([mink1], [mink2], 'ro', ms=5, label=label)
-    return mink1, mink2
+
+
+def get_min_and_plot(kk1s, kk2s, cchisq, ddof, name):
+    """
+    convenience method to find the minimum chisq and immediately plot it on a figure
+    :param kk1s: k1 axis
+    :param kk2s: k2 axis
+    :param cchisq: chisq grid
+    :param ddof: degrees of freedom
+    :param name: name of the savefile
+    """
+    minima = get_minimum(kk1s, kk2s, cchisq)
+    idx = get_min_idx(cchisq)
+    print(name, minima, cchisq[idx] / ddof)
+
+    if len(np.unique(kk1s)) > 1:
+        ddof -= 2
+        fig = plt.figure()
+        ax = plot_contours(fig, kk1s, kk2s, cchisq, ddof)
+        mark_minimum(ax, kk1s, kk2s, cchisq, r"$\chi^2_{\textrm{red,min}}" + " = {}, {}$".format(minima[0], minima[1]))
+        ax.legend(loc=2)
+        ax.set_title(r"$\chi^2_{\textrm{red}}$ " + name)
+        ax.set_xlabel(r'$K_1(\si{\km\per\second})$')
+        ax.set_ylabel(r'$K_2(\si{\km\per\second})$')
+        plt.grid()
+        plt.tight_layout()
+        fig.savefig(folder + '/chisq{}.png'.format(name), dpi=200)
+        plt.close(fig)
+
+        fig = plt.figure()
+        ax = plot_uncertainty(fig, kk1s, kk2s, cchisq, ddof)
+        ax.set_title(r'$1-P(\nu/2, \chi^2/2)$ ' + name)
+        ax.set_xlabel(r'$K_1(\si{\km\per\second})$')
+        ax.set_ylabel(r'$K_2(\si{\km\per\second})$')
+        plt.tight_layout()
+        fig.savefig(folder + '/error{}.png'.format(name), dpi=200)
+        plt.close(fig)
+
+        fig = plt.figure(figsize=(4, 6))
+        ax = plot_oneDee(fig, kk1s, cchisq[:, idx[1]], ddof, 1)
+        ax.set_title(r"$\chi^2_{\textrm{red}} " + name)
+        ax.set_xlabel(r'$K_1(\si{\km\per\second})$')
+        ax.set_ylabel(r'$\chi_{\textrm{red}}^2$')
+        # plt.grid()
+        # plt.tight_layout()
+        fig.savefig(folder + '/chisqmargk2{}.png'.format(name))
+        plt.close(fig)
+
+        fig = plt.figure(figsize=(4, 6))
+        ax = plot_oneDee(fig, kk2s, cchisq[idx[0], :], ddof, 2)
+        ax.set_title(r"$\chi^2_{\textrm{red}} " + name)
+        ax.set_xlabel(r'$K_2(\si{\km\per\second})$')
+        ax.set_ylabel(r'$\chi_{\textrm{red}}^2$')
+        # plt.grid()
+        # plt.tight_layout()
+        fig.savefig(folder + '/chisqmargk1{}.png'.format(name), dpi=200)
+        plt.close(fig)
+    else:
+        ddof -= 1
+        fig = plt.figure(figsize=(4, 6))
+        ax = plot_oneDee(fig, kk2s, cchisq[idx[0], :], ddof, 2)
+        ax.set_title(r"$\chi^2_{\textrm{red}}$ " + name)
+        ax.set_xlabel(r'$K_2(\si{\km\per\second})$')
+        ax.set_ylabel(r'$\chi_{\textrm{red}}^2$')
+        # plt.grid()
+        # plt.tight_layout()
+        fig.savefig(folder + '/chisqmargk1{}.png'.format(name), dpi=200)
+        plt.close(fig)
 
 
 if __name__ == "__main__":
@@ -80,106 +228,106 @@ if __name__ == "__main__":
     import sys
 
     folder = sys.argv[1]
-    dof = 0
-    lines = dict()
-    # lines['Heta'] = (8.249, 8.2545)
-    # lines['Hzeta'] = (8.263, 8.2685)
-    # lines['FeI3923'] = (8.273, 8.2765)
-    # lines['HeI+II4026'] = (8.2985, 8.3025)
-    # lines['Hdelta'] = (8.3155, 8.3215)
-    # lines['SiIV4116'] = (8.3215, 8.3238)
-    # lines['HeI4143'] = (8.3280, 8.3305)
-    # lines['HeII4200'] = (8.3410, 8.3445)
-    # lines['Hgamma'] = (8.3720, 8.3785)
-    # lines['NIII4379'] = (8.3835, 8.3857)
-    # lines['HeI4387'] = (8.3855, 8.3875)
-    # lines['HeI4471'] = (8.4045, 8.4065)
-    # lines['HeII4541'] = (8.4190, 8.4230)
-    lines['FeII4584'] = (8.4293, 8.4315)
-    # lines['HeII4686'] = (8.4510, 8.4535)
-    # lines['HeI4713'] = (8.4575, 8.4590)
-    # lines['Hbeta'] = (8.4850, 8.4925)
-    # lines['HeI5016'] = (8.5195, 8.5215)
-    lines['FeII5167'] = (8.5495, 8.5513)
-    lines['FeII5198'] = (8.5550, 8.5567)
-    lines['FeII5233'] = (8.5621, 8.5639)
-    lines['FeII5276'] = (8.5700, 8.5716)
-    lines['FeII5316'] = (8.5778, 8.5793)
-    # lines['HeII5411'] = (8.5935, 8.5990)
-    # lines['FeII5780'] = (8.6617, 8.6629)
-    # lines['CIV5801'] = (8.6652, 8.6667)
-    # lines['CIV5812'] = (8.6668, 8.6685)
-    # lines['HeI5875'] = (8.6775, 8.6795)
-    # lines['Halpha'] = (8.7865, 8.7920)
-    # lines['HeI6678'] = (8.8045, 8.8095)
-    st = 'allFeII'
 
-    st = 'allFeII'
+    Hs = dict()
+    Hs['Hdelta'] = (8.3155, 8.3215)
+    Hs['Hgamma'] = (8.3720, 8.3785)
+    Hs['Hbeta'] = (8.4850, 8.4925)
+    # Hs['Halpha'] = (8.7865, 8.7920)
+    Hs['name'] = 'H'
 
-    for line in lines.keys():
-        print('finding', line, '...')
-        with open(glob.glob(folder + '/in{}'.format(line))[0]) as f:
-            dof += int(f.readlines()[-1])
-    chisqfiles = list()
-    for line in lines.keys():
-        chisqfiles.append(glob.glob(folder + '/chisqs/chisq{}.npz'.format(line))[0])
-    k1s, k2s, chisq = file_analyser(chisqfiles[0])
+    # metals = dict()
+    # metals['FeII4584'] = (8.4292, 8.4316)
+    # metals['FeII5167'] = (8.5494, 8.5514)
+    # metals['FeII5198'] = (8.5549, 8.5568)
+    # metals['FeII5233'] = (8.5620, 8.5640)
+    # metals['FeII5276'] = (8.5699, 8.5717)
+    # metals['FeII5316+SII5320'] = (5310, 5325)
+    # metals['FeII5362'] = (8.5865, 8.5872)
+    # metals['OIII5592'] = (5584, 5600)
+    # metals['CIII5696'] = (5680, 5712)
+    # metals['FeII5780'] = (5770, 5790)
+    # metals['CIV5801+12'] = (5798, 5817)
+    # metals['name'] = 'metals'
 
-    for i in range(1, len(chisqfiles)):
-        _, _, chisqhere = file_analyser(chisqfiles[i])
-        chisq += chisqhere
-    minima = get_minimum(k1s, k2s, chisq)
-    idx = get_min_idx(chisq)
-    print(minima)
+    HeIs = dict()
+    # Hes['HeI4009'] = (8.2945, 8.2980)
+    # HeIs['HeI+II4026'] = (8.2985, 8.3025)
+    # HeIs['HeI4121'] = (8.3226, 8.3247)
+    # HeIs['HeI4143'] = (8.3280, 8.3305)
+    # HeIs['HeI4387'] = (8.3855, 8.3875)
+    # HeIs['HeI4471'] = (8.4045, 8.4065)
+    # HeIs['HeI4713'] = None
+    # HeIs['HeI5016'] = None
+    HeIs['HeI5875'] = None
+    # HeIs['HeI6678'] = None
+    HeIs['name'] = 'HeI'
 
-    if len(uniques(k1s)) > 1:
-        dof -= 2
-        fig = plt.figure()
-        ax = plot_contours(fig, k1s, k2s, chisq, dof)
-        mark_minimum(ax, k1s, k2s, chisq, r"$\chi^2_{\textrm{red,min}}$")
-        ax.legend(loc=2)
-        ax.set_title(r"$\chi^2_{\textrm{red}}$")
-        ax.set_xlabel(r'$K_1(\si{\km\per\second})$')
-        ax.set_ylabel(r'$K_2(\si{\km\per\second})$')
-        plt.grid()
-        plt.tight_layout()
-        fig.savefig(folder + '/chisq{}.png'.format(st), dpi=200)
-        plt.close(fig)
+    HeIIs = dict()
+    HeIIs['HeII4200'] = None
+    HeIIs['HeII4541'] = None
+    HeIIs['HeII4686'] = None
+    HeIIs['HeII5411'] = None
+    HeIIs['name'] = 'HeII'
 
-        fig = plt.figure()
-        ax = plot_uncertainty(fig, k1s, k2s, chisq, dof)
-        ax.set_title(r'$1-P(\nu/2, \chi^2/2)$')
-        ax.set_xlabel(r'$K_1(\si{\km\per\second})$')
-        ax.set_ylabel(r'$K_2(\si{\km\per\second})$')
-        plt.tight_layout()
-        fig.savefig(folder + '/error{}.png'.format(st), dpi=200)
-        plt.close(fig)
+    groups = list()
+    groups.append(Hs)
+    # groups.append(Fes)
+    groups.append(HeIs)
+    groups.append(HeIIs)
 
-        fig = plt.figure()
-        ax = plot_uncertainty_unscaled(fig, k1s, k2s, chisq, dof)
-        ax.set_title(r'$1-P(\nu/2, \chi^2/2)$')
-        ax.set_xlabel(r'$K_1(\si{\km\per\second})$')
-        ax.set_ylabel(r'$K_2(\si{\km\per\second})$')
-        plt.tight_layout()
-        fig.savefig(folder + '/errorunscaled{}.png'.format(st), dpi=200)
-        plt.close(fig)
+    alll = dict()
+    alll['name'] = 'all'
+    for lines in groups:
+        for line in lines.keys():
+            if line == 'name':
+                continue
+            alll[line] = lines[line]
+    groups.append(alll)
 
-        fig = plt.figure()
-        ax = plot_oneDee(fig, k1s, chisq[:, idx[1]], dof)
-        ax.set_title(r"$\chi^2_{\textrm{red}}, K_2 = $" + " " + str(k2s[idx[1]]) + " " + r'$\si{\km\per\second}$')
-        ax.set_xlabel(r'$K_1(\si{\km\per\second})$')
-        plt.grid()
-        plt.tight_layout()
-        fig.savefig(folder + '/chisqmargk2{}.png'.format(st), dpi=200)
-        plt.close(fig)
-    else:
-        dof -= 1
-    fig = plt.figure()
-    ax = plot_oneDee(fig, k2s, chisq[idx[0], :], dof)
-    ax.set_title(r"$\chi^2_{\textrm{red}}, K_1 = $" + " " + str(k1s[idx[0]]) + " " + r'$\si{\km\per\second}$')
-    ax.set_xlabel(r'$K_2(\si{\km\per\second})$')
-    plt.grid()
-    plt.tight_layout()
-    fig.savefig(folder + '/chisqmargk1{}.png'.format(st), dpi=200)
-    plt.close(fig)
+    for lines in groups:
+        chisqfiles = list()
+        infiles = list()
+        # find all files present
+        for line in lines.keys():
+            if line == 'name':
+                continue
+            print('finding', line, '...')
+            try:
+                chisqfiles.append(glob.glob(folder + '/chisqs/chisq{}.npz'.format(line))[0])
+            except IndexError as e:
+                print(e, 'cannot find {}'.format(line))
+                continue
+            infiles.append(glob.glob(folder + '/in{}'.format(line))[0])
+        # of those present, add dof
+        if len(infiles) == 0:
+            continue
+        dof = 0
+        for file in infiles:
+            with open(file) as f:
+                dof += int(f.readlines()[-1])
+        # parse first file
+        k1s, k2s, chisq = file_parser(chisqfiles[0])
+        # add up chisq
+        for i in range(1, len(chisqfiles)):
+            _, _, chisqhere = file_parser(chisqfiles[i])
+            chisq += chisqhere
+        # print its minimum
+        get_min_and_plot(k1s, k2s, chisq, dof, lines['name'])
 
+        # construct individual line plots
+        if lines['name'] == 'all':
+            continue  # don't do this for the 'all' line group
+        for line in lines.keys():
+            if line == 'name':
+                continue
+            try:
+                chisqfile = glob.glob(folder + '/chisqs/chisq{}.npz'.format(line))[0]
+            except IndexError as e:
+                print(e, 'cannot find {}'.format(line))
+                continue
+            infile = glob.glob(folder + '/in{}'.format(line))[0]
+            with open(infile) as f:
+                dof = int(f.readlines()[-1])
+            k1s, k2s, chisq = file_parser(chisqfile)
+            get_min_and_plot(k1s, k2s, chisq, dof, line)

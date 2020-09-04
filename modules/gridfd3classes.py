@@ -1,3 +1,6 @@
+"""
+Defines the Fd3gridline object and its MCMC brother
+"""
 import os
 import re
 import shutil
@@ -6,14 +9,40 @@ import threading
 import time
 import typing
 
-import astropy.io.fits as fits
 import numpy as np
-import scipy.interpolate as spint
+
+import modules.spectra_manager as spec_man
+
+
+class SpectrumError(Exception):
+    """
+    internal exception when something goes wrong loading spectra
+    """
+
+    def __init__(self, file, line, msg):
+        super().__init__()
+        print('Spectrum error for:', line, 'due to file', file, ':', msg)
+
+
+class Fd3Exception(Exception):
+    """
+    internal exception when something goes wrong running gridf3 executable
+    """
+
+    def __init__(self, msg, line, threadno=None, iteration=None):
+        super().__init__()
+        if threadno is not None:
+            print('Fd3Exception for:', line, 'in thread', threadno, 'iteration', iteration, ':', msg)
+        else:
+            print('Fd3Exception for:', line, ':', msg)
 
 
 class Fd3gridLine:
+    """
+    defines one gridFd3 Job to be executed by a single binary call
+    """
 
-    def __init__(self, name, limits, samp, spectra_files, mc, tl, lfs, orb, orberr, po, ps, k1s, k2s):
+    def __init__(self, name, limits, samp, spectra_files, mc, tl, lfs, orb, orberr, po, ps, k1s, k2s, back=False):
         self.k1s = k1s
         self.k2s = k2s
         self.po = po
@@ -24,76 +53,33 @@ class Fd3gridLine:
         self.orb = orb
         self.orberr = orberr
         self.name = name
-        self.used_spectra = list()
-        self.limits = limits
-        self.base = np.arange(limits[0] - 0.0001, limits[1] + 0.0001, samp)
+        self.limits = np.log(limits)
+        self.base = np.arange(self.limits[0] - 0.0001, self.limits[1] + 0.0001, samp)
+        self.edgepoints = int(np.floor(0.0001 / samp))
         self.data = list()
         self.noises = list()
         self.mjds = list()
         self.spectra = spectra_files
         self.dof = 0
-
-    def set_spectra(self):
-        self.data = list()
-        for j in range(len(self.spectra)):
-            with fits.open(self.spectra[j]) as hdul:
-                try:
-                    spec_hdu = hdul['NORM_SPECTRUM']
-                except KeyError:
-                    print(self.spectra[j], 'has no normalized spectrum, skipping')
-                    continue
-                loglamb = spec_hdu.data['log_wave']
-                # check whether base is completely covered
-                if loglamb[0] >= self.base[0] or loglamb[-1] <= self.base[-1]:
-                    print(self.spectra[j], 'does not fully cover', self.name)
-                    continue
-                # check whether spline is present
-                try:
-                    hdul['LOG_NORM_SPLINE']
-                except KeyError:
-                    print(self.spectra[j], 'has no log_norm_spline')
-                    continue
-                # determine indices where the line resides
-                start = 0
-                startline = 0
-                endline = 0
-                while loglamb[start] < self.base[0]:
-                    start += 1
-                    startline += 1
-                    endline += 1
-                # check if start of noise estimation interval is not zero
-                if spec_hdu.data['norm_flux'][start] < 0.01:
-                    print(self.spectra[j], 'has low start of noise interval in line', self.name)
-                    continue
-                while loglamb[startline] < self.limits[0]:
-                    startline += 1
-                    endline += 1
-                # check if end of noise estimation interval is not zero or if no data in the estimation interval
-                if spec_hdu.data['norm_flux'][startline] < 0.01 or start == startline:
-                    print(self.spectra[j], 'has low end of noise interval in line', self.name)
-                    continue
-                while loglamb[endline] < self.limits[1]:
-                    endline += 1
-                # check whether end of line is not in interorder spacing of spectrograph
-                if spec_hdu.data['norm_flux'][endline] < 0.01:
-                    print(self.spectra[j], 'has low end of data interval in line', self.name)
-                    continue
-                self.used_spectra.append(self.spectra[j])
-                # append in base evaluated flux values
-                evals = spint.splev(self.base, hdul['log_NORM_SPLINE'].data[0])
-                self.data.append(evals)
-                # determine noise near this line
-                self.noises.append(np.std(hdul['NORM_SPECTRUM'].data['norm_flux'][start:startline]))
-                # record mjd in separate list
-                self.mjds.append(hdul[0].header['MJD-obs'])
-        self.data = np.array(self.data)
-        self.data.setflags(write=False)  # make sure the original data is immutable!
-        self.dof = len(self.used_spectra) * len(self.base)
-        print(' this line uses {} spectra'.format(len(self.used_spectra)))
+        self.used_spectra = 0
+        self.back = back
 
     def run(self, wd, iteration: int = None):
+        """
+        do the grid minimization.
+        1. write infile
+        2. write obsfile for fd3
+        3. run the executable
+        4. save output in handy-dandy npz files for later handling
+        :param wd: working directory
+        :param iteration: if an MCMC is running, which iteration are we doing
+        """
         if not iteration or iteration == 1:
-            self.set_spectra()
+            print(' fetching spectrum data for {}'.format(repr(self)))
+            self._set_spectra()
+        if self.used_spectra < 1:
+            print(' {} has no spectral data, skipping'.format(repr(self)))
+            return
         if not iteration:
             print(' making in file for {}'.format(repr(self)))
         self._make_infile(wd)
@@ -107,7 +93,24 @@ class Fd3gridLine:
             print(' saving output for {}'.format(repr(self)))
         self._save_output(wd, iteration)
 
-    def perturb_spectra(self):
+    def _set_spectra(self):
+        self.data = list()
+        for j in range(len(self.spectra)):
+            try:
+                fluxhere, noisehere, mjdhere = spec_man.getspectrum(repr(self), self.spectra[j], self.base,
+                                                                    self.edgepoints)
+            except SpectrumError:
+                continue
+            self.data.append(fluxhere)
+            self.noises.append(noisehere)
+            self.mjds.append(mjdhere)
+            self.used_spectra += 1
+        self.data = np.array(self.data)
+        self.data.setflags(write=False)  # make sure the original data is immutable!
+        self.dof = self.used_spectra * len(self.base)
+        print(' {} uses {} spectra'.format(self.name, self.used_spectra))
+
+    def _perturb_spectra(self):
         newdata = np.copy(self.data)
         n = newdata.shape[1]
         m = newdata.shape[0]
@@ -115,33 +118,38 @@ class Fd3gridLine:
         pert = np.random.default_rng().normal(loc=0, scale=self.noises, size=(n, m))
         return newdata + pert.T
 
-    def perturb_orbit(self):
+    def _perturb_orbit(self):
         return self.orb + np.random.default_rng().normal(0, self.orberr, 4)
 
     def _make_infile(self, wd):
         with open(wd + '/in{}'.format(self.name), 'w') as infile:
             # write first line
-            infile.write(wd + "/master{}.obs ".format(self.name))
+            infile.write(wd + "/{} ".format(self.name))
             infile.write("{} ".format(self.limits[0]))
-            infile.write("{} \n".format(self.limits[1]))
+            infile.write("{} ".format(self.limits[1]))
+            # write whether you want the model spectra or not
+            if self.back:
+                infile.write("1 \n")
+            else:
+                infile.write("0 \n")
             # write the star switches
             if self.tl:
                 infile.write('1 1 1 \n')
             else:
                 infile.write('1 1 0 \n')
             # write observation data
-            for j in range(len(self.used_spectra)):
+            for j in range(self.used_spectra):
                 if self.tl:
                     infile.write(
                         str(self.mjds[j]) + ' 0 {} {} {} {}\n'.format(self.noises[j], self.lfs[0], self.lfs[1],
                                                                       self.lfs[2]))
-                # correction, noise, lfA, lfB, lfC
+                # mjd, correction, noise, lfA, lfB, lfC
                 else:
                     infile.write(
                         str(self.mjds[j]) + ' 0 {} {} {}\n'.format(self.noises[j], self.lfs[0], self.lfs[1]))
-                # correction, noise, lfA, lfB
+                # mjd, correction, noise, lfA, lfB
             if self.mc and self.po:
-                params = self.perturb_orbit()
+                params = self._perturb_orbit()
             else:
                 params = self.orb
             infile.write('1 0 0 0 0 0 \n')  # dummy parameters for the wide AB--C orbit
@@ -153,11 +161,11 @@ class Fd3gridLine:
             infile.write('{}\n'.format(self.dof))
 
     def _make_masterfile(self, wd):
-        with open(wd + '/master{}.obs'.format(self.name), 'w') as obsfile:
-            obsfile.write('# {} X {} \n'.format(len(self.used_spectra) + 1, len(self.base)))
+        with open(wd + '/{}.obs'.format(self.name), 'w') as obsfile:
+            obsfile.write('# {} X {} \n'.format(self.used_spectra + 1, len(self.base)))
             master = [self.base]
             if self.mc and self.ps:
-                data = self.perturb_spectra()
+                data = self._perturb_spectra()
             else:
                 data = self.data
             for ii in range(len(data)):
@@ -169,7 +177,7 @@ class Fd3gridLine:
 
     def _run_fd3grid(self, wd):
         with open(wd + '/in{}'.format(self.name)) as inpipe, open(wd + '/out{}'.format(self.name), 'w') as outpipe:
-            sp.run(['./fd3grid'], stdin=inpipe, stdout=outpipe)
+            sp.run(['./bin/fd3grid'], stdin=inpipe, stdout=outpipe)
 
     def _save_output(self, wd, iteration):
         with open(wd + '/out{}'.format(self.name)) as f:
@@ -190,16 +198,19 @@ class Fd3gridLine:
                  k2s=kk2s, chisq=cchisq)
 
     def __repr__(self):
-        return self.name + 'line'
+        return self.name
 
 
 class Fd3gridMCThread(threading.Thread):
+    """
+    defines an MCMC thread that runs its containing fd3gridlines for some specified number of iterations.
+    """
 
-    def __init__(self, fd3folder, threadno, iterations, fd2gridlines: typing.List[Fd3gridLine]):
+    def __init__(self, fd3folder, threadno, iterations, fd3gridlines: typing.List[Fd3gridLine]):
         super().__init__()
         self.threadno = threadno
         self.wd = fd3folder + "/thread" + str(threadno)
-        self.fd2gridlines = fd2gridlines
+        self.fd3gridlines = fd3gridlines
         self.iterations = iterations
         self.threadtime = time.time()
         self.chisqs = list()
@@ -218,21 +229,30 @@ class Fd3gridMCThread(threading.Thread):
             pass
 
     def run(self) -> None:
+        """
+        Run this thread for its specified number of iterations.
+        """
+        ii = 0
+        ffd3line = None
         try:
             for ii in range(self.iterations):
                 # execute fd3gridline runs
                 print('Thread {} running gridfd3 iteration {}...'.format(self.threadno, ii + 1))
-                for ffd2line in self.fd2gridlines:
-                    ffd2line.run(self.wd, ii + 1)
+                for ffd3line in self.fd3gridlines:
+                    ffd3line.run(self.wd, ii + 1)
                 print('estimated time to completion of thread {}: {}h'.format(self.threadno,
                                                                               (time.time() - self.threadtime) * (
                                                                                       self.iterations - ii - 1) / 3600))
                 self.threadtime = time.time()
         except Exception as e:
-            print('Exception occured when running gridfd3:', e)
+            print('Exception occured when running gridfd3 for thread {}:'.format(self.threadno), e)
+            raise Fd3Exception(e, ffd3line, self.threadno, ii)
 
 
 class Fd3gridThread(threading.Thread):
+    """
+    defines a thread that runs its single fd3line object.
+    """
 
     def __init__(self, fd3folder, fd3gridline: Fd3gridLine):
         super().__init__()
@@ -240,7 +260,11 @@ class Fd3gridThread(threading.Thread):
         self.wd = fd3folder
 
     def run(self):
+        """
+        runs the fd3gridline disentangling
+        """
         try:
             self.fd3gridline.run(self.wd)
-        except Exception as e:
-            print('Exeption occured when running gridfd3 for {}:'.format(repr(self.fd3gridline)), e)
+        except FileNotFoundError as e:
+            print('Exception occured when running gridfd3 for {}:'.format(repr(self.fd3gridline)), e)
+            raise Fd3Exception(e, self.fd3gridline)
