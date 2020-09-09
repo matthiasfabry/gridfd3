@@ -1,4 +1,3 @@
-
 #include "kepler.h"
 
 #include <math.h>

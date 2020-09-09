@@ -13,7 +13,7 @@
 /*************************************************************************/
 
 double fd3sep ( long K, long M, long N, double **dftobs, double *sig,
-		double **rvm, double **lfm, double **dftmod, int back ) {
+		double **rvm, double **lfm, double **dftmod) {
 
 	long i, j, k, n;
 	double s2;
@@ -84,13 +84,6 @@ double fd3sep ( long K, long M, long N, double **dftobs, double *sig,
                 db = gsl_vector_get ( b, 2*j+i ) - bc;
                 s2 += db * db * ( n % ((N+1)/2) ? 2 : 1 );
             }
-        if (back){
-            /* copy to output */
-            for ( k = 0 ; k < K ; k++ ) {
-                *(*(dftmod+k)+2*n  ) = gsl_vector_get ( x, 2*k   );
-                *(*(dftmod+k)+2*n+1) = gsl_vector_get ( x, 2*k+1 );
-            }
-        }
 	}
 
 	/* close */

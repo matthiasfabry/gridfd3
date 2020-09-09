@@ -41,7 +41,7 @@ static long   K, M, N, Ndft, nfp;
 static double **dftobs, **dftmod;
 static double rvstep, *otimes, *rvcorr, *sig, **lfm, **rvm;
 static double op0[TRIORB_NP];
-static double meritfn ( double *op, double rvA, double rvB, int backswitch);
+static double meritfn ( double *op, double rvA, double rvB);
 
 #define MX_FDBINARY_FORMAT "%15.8E   "
 static char *mxfd3fmts=MX_FDBINARY_FORMAT;
@@ -52,8 +52,8 @@ int main ( int argc, char *argv[] ) {
 
     long i, i0, i1, j, k, vc, vlen, rootfnlen;
     double **masterobs, **obs, z0, z1, **mod, *rvAs, *rvBs, **chi2, lowA, highA, lowB, highB, stepA, stepB;
-    char rootfn[1024], obsfn[1024], modfn[1024], rvsfn[1024];
-    int backswitch, sampA, sampB;
+    char rootfn[1024], obsfn[1024], rvsfn[1024];
+    int sampA, sampB;
 
     setbuf ( stdout, NULL );
     MxError( FDBErrorString, stdout, fdbfailure );
@@ -71,7 +71,6 @@ int main ( int argc, char *argv[] ) {
     rvstep = SPEEDOFLIGHT * ( - 1 + exp ((z1-z0)/(vlen-1)) );
     GETDBL ( &z0 );
     GETDBL ( &z1 );
-    GETINT ( &backswitch );
     i0 = 0;
     while ( *(*masterobs+i0) < z0 )
         i0++;
@@ -95,7 +94,6 @@ int main ( int argc, char *argv[] ) {
     Ndft = 2*(N/2 + 1);
     /* allocating memory */
     dftobs = MxAlloc ( M, Ndft );
-    mod = MxAlloc ( K+1, N );
     dftmod = MxAlloc ( K, Ndft );
     otimes = *MxAlloc ( 1, M );
     rvcorr = *MxAlloc ( 1, M );
@@ -139,15 +137,9 @@ int main ( int argc, char *argv[] ) {
     printf ( "k1 k2 chisq \n" );
     for (i=0; i<sampA; i++){
         for (j=0; j<sampB; j++){
-            *(*(chi2+i)+j) = meritfn ( op0 , *(rvAs+i), *(rvBs+j), backswitch);
+            *(*(chi2+i)+j) = meritfn ( op0 , *(rvAs+i), *(rvBs+j));
             printf ( "%.5f %.5f %.5f\n", *(rvAs+i), *(rvBs+j), *(*(chi2+i)+j));
             MxWrite( rvm, K, M, rvsfn );
-            if ( backswitch ){
-                dft_bck ( K, N, dftmod, mod+1 );
-                sprintf ( modfn, "%s", rootfn );
-                sprintf( modfn+rootfnlen, "%.3f_%.3f.mod", *(rvAs+i), *(rvBs+j));
-                MxWrite ( mod, K+1, N, modfn);
-            }
         }
     }
     return EXIT_SUCCESS;
@@ -155,7 +147,7 @@ int main ( int argc, char *argv[] ) {
 
 /*****************************************************************************/
 
-double meritfn ( double *opin, double rvA, double rvB, int backswitch) {
+double meritfn ( double *opin, double rvA, double rvB) {
 
     long j, k;
     double op[TRIORB_NP+2], rv[3];
@@ -180,7 +172,7 @@ double meritfn ( double *opin, double rvA, double rvB, int backswitch) {
             *(*(rvm+k)+j) = rv[k] + *(rvcorr+j) / rvstep;
     }
 
-    return fd3sep ( K, M, N, dftobs, sig, rvm, lfm, dftmod, backswitch);
+    return fd3sep ( K, M, N, dftobs, sig, rvm, lfm, dftmod);
 }
 
 /*****************************************************************************/

@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.optimize as spopt
 import scipy.special as sps
+import glob
 
 
 def file_parser(ffile):
@@ -74,8 +75,8 @@ def plot_oneDee(ffig, ks, cchisq, ddof, num):
         axx.text(np.min(ks), (np.max(cchisq) + np.min(cchisq)) / ddof / 2,
                  r'$K_{} = {}^{{+ {}}}_{{- {}}}$'.format(num, minimum, np.round(plus - minimum, 2),
                                                          np.round(minimum - mins, 2)))
-    except TypeError as e:
-        print(e, 'cannot plot errors if they dont exist')
+    except TypeError as ee:
+        print(ee, 'cannot plot errors if they dont exist')
         axx.text(np.min(ks), (np.max(chisq) + np.min(chisq)) / ddof / 2,
                  'error outside grid')
     return axx
@@ -110,8 +111,8 @@ def oneDee_sigma(ks, cchisq, ddof):
         while cchisq[ii] > ones:
             ii += 1
         mins = ks[ii - 1] if ii != 0 else ks[0]
-    except ValueError as e:
-        print(e, 'no root found in root_scalar')
+    except ValueError as ee:
+        print(ee, 'no root found in root_scalar')
         ones, plus, mins = None, None, None
     return ones, plus, mins
 
@@ -220,11 +221,21 @@ def get_min_and_plot(kk1s, kk2s, cchisq, ddof, name):
         plt.close(fig)
 
 
+def get_min_of_run(wd):
+    files = glob.glob(wd + '/chisqs/*')
+    # parse first file
+    kk1s, kk2s, cchisq = file_parser(files[0])
+    # add up chisq
+    for ii in range(1, len(files)):
+        _, _, cchisqhere = file_parser(files[ii])
+        cchisq += chisqhere
+    # print its minimum
+    return get_minimum(kk1s, kk2s, cchisq)
+
+
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
-    import glob
-    # noinspection PyUnresolvedReferences
-    import plotsetup
+    import plotsetup  # noqa
     import sys
 
     folder = sys.argv[1]
