@@ -33,7 +33,7 @@ void fdbfailure(void) { exit ( EXIT_FAILURE ); }
 
 /*****************************************************************************/
 
-#define SPEEDOFLIGHT 2.998E5 /* speed of light in km/s */
+#define SPEEDOFLIGHT 299792.458 /* speed of light in km/s */
 
 static char *triorb_strings[] = {
         /*  0 */  "period of AB--C",                    "day", "%.9lg",

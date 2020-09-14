@@ -2,7 +2,7 @@
 all : clean gridfd3 fd3
 
 clean :
-	rm -f ./bin/* ./src/*.o
+	rm -f ./bin/* ./src/**/*.o
 
 gridfd3 : src/gridfd3/fd3grid.o src/gridfd3/fd3sep.o src/gridfd3/triorb.o src/kepler.o src/mxfuns.o
 	${CC} -Wall src/gridfd3/fd3grid.o src/gridfd3/fd3sep.o src/gridfd3/triorb.o src/kepler.o src/mxfuns.o \

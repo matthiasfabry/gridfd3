@@ -49,7 +49,7 @@ lines['HeI5875'] = (8.6777, 8.6794, 5e-6)
 files = list()
 mink1s, mink2s, combs = list(), list(), list()
 k1s, k2s = None, None
-
+lines = sorted(lines)
 iterations = 0
 c = 0
 while True:
@@ -62,9 +62,9 @@ while True:
         k1it, k2it, combit, chisqit = None, None, None, None
         must_break = False
         for line in lines:
-            files = glob.glob(folder + '/thread{}/chisqs/chisq{}{}.npz'.format(c + 1, line, i), recursive=True)
+            files = sorted(glob.glob(folder + '/thread{}/chisqs/chisq{}{}.npz'.format(c, line, i), recursive=True))
             if files is None or len(files) < 1:
-                print('no file at thread', c + 1, 'line', line, 'iteration', i)
+                print('no file at thread', c, 'line', line, 'iteration', i)
                 must_break = True
                 break
 

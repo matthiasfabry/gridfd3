@@ -122,7 +122,7 @@ def get_minimum(kk1s, kk2s, cchisq):
     finds the minimal k1 and k2 of this chisq grid
     :param kk1s: k1 axis
     :param kk2s: k2 axis
-    :param cchisq: chisq grid
+    :param cchisq: chisq gr  id
     :return: k1, k2 for which chisq is minimal
     """
     iidx = list(np.unravel_index(np.argmin(cchisq), cchisq.shape))
@@ -228,7 +228,7 @@ def get_min_of_run(wd):
     # add up chisq
     for ii in range(1, len(files)):
         _, _, cchisqhere = file_parser(files[ii])
-        cchisq += chisqhere
+        cchisq += cchisqhere
     # print its minimum
     return get_minimum(kk1s, kk2s, cchisq)
 

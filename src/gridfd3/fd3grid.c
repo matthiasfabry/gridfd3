@@ -33,7 +33,7 @@ void fdbfailure(void) { exit ( EXIT_FAILURE ); }
 
 /*****************************************************************************/
 
-#define SPEEDOFLIGHT 2.998E5 /* speed of light in km/s */
+#define SPEEDOFLIGHT 299792.458 /* speed of light in km/s */
 
 /*****************************************************************************/
 
@@ -51,8 +51,8 @@ static char *mxfd3fmts=MX_FDBINARY_FORMAT;
 int main ( int argc, char *argv[] ) {
 
     long i, i0, i1, j, k, vc, vlen, rootfnlen;
-    double **masterobs, **obs, z0, z1, **mod, *rvAs, *rvBs, **chi2, lowA, highA, lowB, highB, stepA, stepB;
-    char rootfn[1024], obsfn[1024], rvsfn[1024];
+    double **masterobs, **obs, z0, z1, *rvAs, *rvBs, **chi2, lowA, highA, lowB, highB, stepA, stepB;
+    char rootfn[1024], obsfn[1024];
     int sampA, sampB;
 
     setbuf ( stdout, NULL );
@@ -63,7 +63,6 @@ int main ( int argc, char *argv[] ) {
     vc=0;
     vlen=0;
     sprintf ( obsfn, "%s", rootfn ); sprintf ( obsfn+rootfnlen, "%s", ".obs" );
-    sprintf ( rvsfn, "%s", rootfn ); sprintf ( rvsfn+rootfnlen, "%s", ".rvs" );
     masterobs = MxLoad ( obsfn, &vc, &vlen );
     M = vc - 1;
     z0 = **masterobs;
@@ -94,7 +93,6 @@ int main ( int argc, char *argv[] ) {
     Ndft = 2*(N/2 + 1);
     /* allocating memory */
     dftobs = MxAlloc ( M, Ndft );
-    dftmod = MxAlloc ( K, Ndft );
     otimes = *MxAlloc ( 1, M );
     rvcorr = *MxAlloc ( 1, M );
     sig = *MxAlloc ( 1, M );
@@ -139,7 +137,6 @@ int main ( int argc, char *argv[] ) {
         for (j=0; j<sampB; j++){
             *(*(chi2+i)+j) = meritfn ( op0 , *(rvAs+i), *(rvBs+j));
             printf ( "%.5f %.5f %.5f\n", *(rvAs+i), *(rvBs+j), *(*(chi2+i)+j));
-            MxWrite( rvm, K, M, rvsfn );
         }
     }
     return EXIT_SUCCESS;
@@ -172,7 +169,7 @@ double meritfn ( double *opin, double rvA, double rvB) {
             *(*(rvm+k)+j) = rv[k] + *(rvcorr+j) / rvstep;
     }
 
-    return fd3sep ( K, M, N, dftobs, sig, rvm, lfm, dftmod);
+    return fd3sep ( K, M, N, dftobs, rvm, sig, lfm);
 }
 
 /*****************************************************************************/

@@ -13,15 +13,15 @@ class SpectrumError(Exception):
         print(' Spectrum error for:', line, 'due to file', file + ':', msg)
 
 
-def getspectrum(line, file, lambdabase, edgepoints):
+def getspectrum(line, file, lambdabase, edgepoints=20):
     """
-    This function must return the fluxvalues evaluated in wavelength range lambdabase, a noise estimation and an mjd
-    of the spectrum denoted by the parameter file. IF you determine this file does not contain a spectrum on lambdabase,
-    raise a SpectrumException
+    This function must return the fluxvalues evaluated in an equally spaced, logarithmic wavelength basis 'lambdabase',
+    a noise estimation and an mjd of the spectrum contained in the parameter 'file'.
+    If you determine this file does not contain a spectrum on lambdabase, raise a SpectrumException
     :param line: string representing the line you are trying to disentangle
     :param file: string that points to the file containing the spectrum (which you glob in the main gridfd3.py script)
     :param lambdabase: wavelength base (in log space) you must return the fluxvalues of
-    :param edgepoints: number of points before the line that is used to estimate the noise
+    :param edgepoints: number of points before the line that are used to estimate the noise
     :return: flux, noise, mjd as stated in the description of this function or None
     """
     with fits.open(file) as hdul:
@@ -34,7 +34,6 @@ def getspectrum(line, file, lambdabase, edgepoints):
         if loglamb[0] > lambdabase[0] or loglamb[-1] < lambdabase[-1]:
             raise SpectrumError(file, line, 'does not cover line')
         try:
-            spline = hdul['NORM_SPLINE']
             logspline = hdul['LOG_NORM_SPLINE']
         except KeyError:
             raise SpectrumError(file, line, 'has no spline')
@@ -44,7 +43,7 @@ def getspectrum(line, file, lambdabase, edgepoints):
         noise = np.std(flux[:edgepoints-1])
         # get mjd
         mjd = hdul[0].header['MJD-obs']
-        return flux, noise, mjd, spline.data[0]
+        return flux, noise, mjd
 
 
 def getspectrumspline(line, file):

@@ -22,8 +22,8 @@ except IndexError:
     exit()
 
 # K1 and K2 ranges to be explored, in string form: 'left right step', all in km/s
-k1str = '15 45 2'
-k2str = '40 65 2'
+k1str = '15 45 1'
+k2str = '40 65 1'
 
 # Indicate if you want the model spectra to be computed
 back = False
@@ -34,8 +34,8 @@ orbit_err = (69, 12, 0.009, 2.3)
 
 # monte carlo switches. If monte_carlo, at least one of the others needs to be true.
 # If not monte_carlo, the others are ignored
-monte_carlo = False
-N = 1000
+monte_carlo = True
+N = 900
 perturb_orbit = True
 perturb_spectra = True
 
@@ -46,7 +46,7 @@ thirdlight = False
 lfs = [0.6173, 0.3827]
 
 # sampling of your spectra in angstrom
-sampling = 0.01
+sampling = 0.075
 
 # enter wavelength range(s) in natural log of wavelength and give name of line. Must be a dict.
 lines = dict()
@@ -76,8 +76,6 @@ lines['HeII5411'] = (5396.4, 5426.2)
 # lines['FeII5780'] = (5770, 5790)
 # lines['CIV5801+12'] = (5798, 5817)
 lines['HeI5875'] = (5869.4, 5881.1)
-
-
 # lines['Halpha'] = (6545, 6580)
 # lines['HeI6678'] = (6674, 6682)
 # lines['OI8446'] = (8437, 8455)
@@ -116,7 +114,7 @@ if K == 0:
     exit()
 
 # gridfd3folder = obj + '/' + str(datetime.today().strftime('%y%m%dT%H%M%S'))
-gridfd3folder = obj + '/testrecomb'
+gridfd3folder = obj + '/recombMC3'
 fd3folder = gridfd3folder + '/fd3'
 pathlib.Path(fd3folder).mkdir(parents=True, exist_ok=True)
 
@@ -132,7 +130,7 @@ with open(gridfd3folder + "/params.txt", 'w') as paramfile:
     paramfile.write('perturb orbit\t' + str(perturb_orbit) + '\n')
     paramfile.write('perturb spectra\t' + str(perturb_spectra) + '\n')
 
-cpus = os.cpu_count()
+cpus = 12
 fd3lineobjects = list()
 print('building fd3gridline object for:')
 for line in lines.keys():
@@ -144,49 +142,32 @@ print('building threads')
 gridthreads = list()
 d3threads = list()
 
+for fd3line in fd3lineobjects:
+    fd3line.set_k1(33)
+    fd3line.set_k2(51)
+    d3threads.append(fd3classes.Fd3Thread(fd3folder, fd3line))
+# do an initial separation to renormalize on
+run_join_threads(d3threads)
+# recombine_and_renorm
+print('renormalizing')
+for fd3line in fd3lineobjects:
+    fd3line.recombine_and_renorm()
 
-def new_threads():
-    d3threads.clear()
-    gridthreads.clear()
-    for ffd3line in fd3lineobjects:
-        gridthreads.append(fd3classes.GridFd3Thread(gridfd3folder, ffd3line))
-        d3threads.append(fd3classes.Fd3Thread(fd3folder, ffd3line))
+if monte_carlo:
+    # create threads
+    print('number of threads will be {}'.format(cpus))
+    print('each thread will have {} iterations to complete'.format(N / cpus))
+    atleast = int(N / cpus)
+    remainder = int(N % cpus)
 
+    for i in range(remainder):
+        gridthreads.append(fd3classes.GridFd3MCThread(gridfd3folder, i + 1, atleast + 1, fd3lineobjects))
+    for i in range(remainder, cpus):
+        gridthreads.append(fd3classes.GridFd3MCThread(gridfd3folder, i + 1, atleast, fd3lineobjects))
 
-# if monte_carlo:
-#     # create threads
-#     print('number of threads will be {}'.format(cpus))
-#     print('each thread will have {} iterations to complete'.format(N / cpus))
-#     atleast = int(N / cpus)
-#     remainder = int(N % cpus)
-#
-#     for i in range(remainder):
-#         gridthreads.append(fd3classes.GridFd3MCThread(gridfd3folder, i + 1, atleast + 1, fd3lineobjects))
-#     for i in range(remainder, cpus):
-#         gridthreads.append(fd3classes.GridFd3MCThread(gridfd3folder, i + 1, atleast, fd3lineobjects))
-
-new_threads()
 setuptime = time.time()
 print('setup took {}s\n'.format(setuptime - starttime))
 print('starting runs!')
-i = 0
-while i < 3:
-    now = time.time()
-    run_join_threads(gridthreads)
-    print('run {} done in {}h'.format(i + 1, (time.time() - now) / 3600))
-    mink1, mink2 = oa.get_min_of_run(gridfd3folder)
-    print('minimum of the last run_fd3 is', mink1, mink2)
-
-    for fd3line in fd3lineobjects:
-        fd3line.set_k1(mink1)
-        fd3line.set_k2(mink2)
-
-    run_join_threads(d3threads)
-    # recombine_and_renorm
-    print('renormalizing')
-    for fd3line in fd3lineobjects:
-        fd3line.recombine_and_renorm()
-    i += 1
-    new_threads()
+run_join_threads(gridthreads)
 print('Thanks for your patience! You waited a whopping {} hours!'.format((time.time() - starttime) / 3600))
 plt.show()

@@ -12,8 +12,7 @@
 
 /*************************************************************************/
 
-double fd3sep ( long K, long M, long N, double **dftobs, double *sig,
-		double **rvm, double **lfm, double **dftmod) {
+double fd3sep ( long K, long M, long N, double **dftobs, double **rvm, double *sig, double **lfm) {
 
 	long i, j, k, n;
 	double s2;
@@ -126,24 +125,3 @@ void dft_fwd ( long m, long n, double **mxin, double **mxout ) {
 }
 
 /*************************************************************************/
-
-void dft_bck ( long m, long n, double **mxin, double **mxout ) {
-
-   long i, j;
-   double a = 1.0 / sqrt(n);
-   gsl_fft_halfcomplex_wavetable * dft_hcwt;
-   gsl_fft_real_workspace * dft_rews;
-
-   dft_hcwt = gsl_fft_halfcomplex_wavetable_alloc (n);
-   dft_rews = gsl_fft_real_workspace_alloc (n);
-
-   for ( j = 0 ; j < m ; j++ ) {
-      *(*(mxout+j)+0) = *(*(mxin+j)+0) / a;
-      for ( i = 1; i < n; i++ ) *(*(mxout+j)+i) = *(*(mxin+j)+i+1) / a;
-      gsl_fft_halfcomplex_inverse ( *(mxout+j), 1, n, dft_hcwt, dft_rews );
-   }
-
-   gsl_fft_halfcomplex_wavetable_free ( dft_hcwt );
-   gsl_fft_real_workspace_free ( dft_rews );
-
-}
