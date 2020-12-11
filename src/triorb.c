@@ -1,11 +1,10 @@
-
 #include <stdlib.h>
 #include <math.h>
 
-#include "../kepler.h"
+#include "kepler.h"
 #include "triorb.h"
 
-#define LITESPEED 2.998E05
+#define LITESPEED 2.99792458E05
 
 int triorb_rv ( double *op, double t, double *rv ) {
 

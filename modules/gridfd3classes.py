@@ -11,8 +11,10 @@ import typing
 
 import scipy.interpolate as spint
 import scipy.optimize as spopt
+import scipy.linalg as spalg
 import numpy as np
 import matplotlib.pyplot as plt
+
 import modules.spectra_manager as spec_man
 
 
@@ -26,20 +28,20 @@ def doppler_shift(w, rv):
 
 class Fd3class:
 
-    def __init__(self, name, linlimits, linsamp, spectra_files, tl, lfs, orb, orberr=None, po=False, ps=False, k1s=None,
-                 k2s=None, k1=None, k2=None):
+    def __init__(self, name, linlimits, linsamp, spectra_files, tl, orb, orberr=None, orbcovar=None, po=False, ps=False, lfs=(0.5, 0.5), k1s=None,
+                 k2s=None):
         self.tl = tl
         self.lfs = lfs
         self.orb = orb
         self.orberr = orberr
+        self.orbcovar = orbcovar
         self.name = name
         logsamp = linsamp / 4500
         self.loglimits = np.log(linlimits)
         self.wideloglimits = self.loglimits + 200 * logsamp * np.array([-1, 1])
         self.linbase = np.arange(linlimits[0] - 20 * linsamp, linlimits[-1] + 20 * linsamp, linsamp)
         self.logbase = np.arange(self.loglimits[0] - 20 * logsamp, self.loglimits[-1] + 20 * logsamp, logsamp)
-        self.widelogbase = np.arange(self.wideloglimits[0] - 20 * logsamp, self.wideloglimits[-1] + 20 * logsamp,
-                                     logsamp)
+        self.widelogbase = np.arange(self.wideloglimits[0] - 20 * logsamp, self.wideloglimits[-1] + 20 * logsamp, logsamp)
         self.edgepoints = 20
         self.data = None
         self.widedata = None
@@ -52,25 +54,11 @@ class Fd3class:
         self.ps = ps
         self.k1s = k1s
         self.k2s = k2s
-        self.k1 = k1
-        self.k2 = k2
         self.prim = None
         self.sec = None
 
     def __repr__(self):
         return self.name
-
-    def set_k1(self, k1):
-        self.k1 = k1
-
-    def set_k2(self, k2):
-        self.k2 = k2
-
-    def set_k1s(self, k1s: str):
-        self.k1s = k1s
-
-    def set_k2s(self, k2s: str):
-        self.k2s = k2s
 
     def ecc_anom_of_phase(self, ph):
         # define keplers equation as function of a phase
@@ -85,8 +73,7 @@ class Fd3class:
         # is the independent variable.
         # current root finding algorithm is toms748, as it has the best convergence (2.7 bits per function evaluation)
         ph = np.remainder(ph, 1)
-        return spopt.root_scalar(keplers_eq(ph), method='toms748',
-                                 bracket=(0, 2 * np.pi)).root
+        return spopt.root_scalar(keplers_eq(ph), method='toms748', bracket=(0, 2 * np.pi)).root
 
     def true_anom(self, ph):
         E = self.ecc_anom_of_phase(ph)
@@ -100,8 +87,7 @@ class Fd3class:
         self.mjds = list()
         for j in range(len(self.spectra)):
             try:
-                fluxhere, noisehere, mjdhere = spec_man.getspectrum(repr(self), self.spectra[j], self.logbase,
-                                                                    self.edgepoints)
+                fluxhere, noisehere, mjdhere = spec_man.getspectrum(repr(self), self.spectra[j], self.logbase, self.edgepoints)
                 wideflux, _, _ = spec_man.getspectrum(repr(self), self.spectra[j], self.widelogbase, self.edgepoints)
             except spec_man.SpectrumError:
                 continue
@@ -125,10 +111,13 @@ class Fd3class:
         return newdata + pert.T
 
     def _perturb_orbit(self):
-        turb = np.random.default_rng().normal(0, self.orberr, 4)
-        turb[3] = np.random.default_rng().uniform(0.9, 1.1) * turb[1] / self.orberr[1] * self.orberr[
-            3]  # error on omega is highly correlated with error on t0
-        return self.orb + turb
+        if self.orbcovar is None:
+            turb = np.random.default_rng().normal(scale=self.orberr)
+        else:
+            turb = np.random.default_rng().normal(size=(4, 1))
+            c = spalg.cholesky(self.orbcovar, lower=True)
+            turb = np.dot(c, turb).T
+        return self.orb + turb[0]
 
     def run_gridfd3(self, wd, iteration: int = None):
         """
@@ -136,7 +125,7 @@ class Fd3class:
         1. write infile
         2. write obsfile for fd3
         3. run_fd3 the executable
-        4. save output in handy-dandy npz files for later handling
+        4. save output in speedy npz files for later handling
         :param wd: working directory
         :param iteration: if an MCMC is running, which iteration are we doing
         """
@@ -164,6 +153,7 @@ class Fd3class:
         1. write infile
         2. write obsfile for fd3
         3. run_fd3 the executable
+        4. handle the output to speedy npz files
         :param wd: working directory
         """
         if self.data is None or self.widedata is None:
@@ -181,37 +171,38 @@ class Fd3class:
 
     def _make_gridfd3_infile(self, wd):
         with open(wd + '/in{}'.format(repr(self)), 'w') as infile:
-            # write first line
-            infile.write(wd + "/{} ".format(repr(self)))
-            infile.write("{} ".format(self.loglimits[0]))
-            infile.write("{} ".format(self.loglimits[1]))
-            # write the star switches
-            if self.tl:
-                infile.write('1 1 1 \n')
-            else:
-                infile.write('1 1 0 \n')
-            # write observation data
-            for j in range(self.no_used_spectra):
-                if self.tl:
-                    infile.write(
-                        str(self.mjds[j]) + ' 0 {} {} {} {}\n'.format(self.noises[j], self.lfs[0], self.lfs[1],
-                                                                      self.lfs[2]))
-                # mjd, correction, noise, lfA, lfB, lfC
-                else:
-                    infile.write(
-                        str(self.mjds[j]) + ' 0 {} {} {}\n'.format(self.noises[j], self.lfs[0], self.lfs[1]))
-                # mjd, correction, noise, lfA, lfB
+            self.__common_infile(wd, infile)
             if self.po:
                 params = self._perturb_orbit()
             else:
                 params = self.orb
-            infile.write('1 0 0 0 0 0 \n')  # dummy parameters for the wide AB--C orbit
             # write the A-B orbital params
-            infile.write('{} {} {} {} 0\n'.format(params[0], params[1], params[2], params[3]))  # 0 is the Deltaomega
+            infile.write(
+                '{} {} {} {} 0 {}\n'.format(params[0], params[1], params[2], params[3], params[4]))  # 0 is the for the precession of the omega
             # write rv ranges and step size
             infile.write('{}\n'.format(self.k1s))
             infile.write('{}\n'.format(self.k2s))
             infile.write('{}\n'.format(self.dof))
+
+    def __common_infile(self, wd, file):
+        # write first line
+        file.write(wd + "/{} ".format(repr(self)))
+        file.write("{} ".format(self.loglimits[0]))
+        file.write("{} ".format(self.loglimits[1]))
+        # write the star switches
+        if self.tl:
+            file.write('1 1 1 \n')
+        else:
+            file.write('1 1 0 \n')
+        # write observation data
+        for j in range(self.no_used_spectra):
+            if self.tl:
+                file.write(str(self.mjds[j]) + ' 0 {} {} {} {}\n'.format(self.noises[j], self.lfs[0], self.lfs[1], self.lfs[2]))
+            # mjd, correction, noise, lfA, lfB, lfC
+            else:
+                file.write(str(self.mjds[j]) + ' 0 {} {} {}\n'.format(self.noises[j], self.lfs[0], self.lfs[1]))  # mjd, correction, noise, lfA, lfB
+
+        file.write('1 1 0 0 0 0 \n')  # dummy parameters for the wide AB--C orbit
 
     def _make_fd3_infile(self, wd):
         with open(wd + '/in{}'.format(repr(self)), 'w') as infile:
@@ -221,29 +212,22 @@ class Fd3class:
             infile.write("{} ".format(self.wideloglimits[1]))
             infile.write("{} ".format(wd + '/products{} '.format(repr(self))))
             if self.tl:
-                infile.write("1 1 1 \n\n")
+                infile.write("1 1 1 \n")
             else:
-                infile.write("1 1 0 \n\n")
+                infile.write("1 1 0 \n")
 
             # write observation data
             for j in range(self.no_used_spectra):
                 if self.tl:
-                    infile.write(
-                        str(self.mjds[j]) + ' 0 {} {} {} {}\n'.format(
-                            self.noises[j], self.lfs[0], self.lfs[1],
-                            self.lfs[2]))  # correction, noise, lfA, lfB, lfC
+                    infile.write(str(self.mjds[j]) + ' 0 {} {} {} {}\n'.format(self.noises[j], self.lfs[0], self.lfs[1],
+                                                                               self.lfs[2]))  # correction, noise, lfA, lfB, lfC
                 else:
-                    infile.write(
-                        str(self.mjds[j]) + ' 0 {} {} {} \n'.format(self.noises[j], self.lfs[0], self.lfs[1]))
-            infile.write('\n')
+                    infile.write(str(self.mjds[j]) + ' 0 {} {} {} \n'.format(self.noises[j], self.lfs[0], self.lfs[1]))
             # write the AB-C orbital params
-            infile.write('1 0     1 0    0 0    0 0    0 0    0 0 \n\n')
+            infile.write('1 0   1 0   0 0   0 0   0 0   0 0\n\n')
             # write the A-B orbital params
             infile.write(
-                '{} 0 {} 0 {} 0 {} 0 {} 0 {} 0 0 0 \n\n'.format(self.orb[0], self.orb[1], self.orb[2], self.orb[3],
-                                                                self.k1, self.k2))
-            # write optimization params (won't be used tho)
-            infile.write('100  1000  0.00001\n')
+                '{} 0 {} 0 {} 0 {} 0 {} 0 {} 0 0 0 \n\n'.format(self.orb[0], self.orb[1], self.orb[2], self.orb[3], self.orb[4], self.orb[5]))
 
     def _make_grid_masterfile(self, wd):
         with open(wd + '/{}.obs'.format(repr(self)), 'w') as obsfile:
@@ -294,28 +278,36 @@ class Fd3class:
         chisqdir = wd + '/chisqs'
         if not os.path.isdir(chisqdir):
             os.mkdir(chisqdir)
-        np.savez(chisqdir + '/chisq{}{}'.format(repr(self), iteration if iteration is not None else ''), k1s=kk1s,
-                 k2s=kk2s, chisq=cchisq)
+        np.savez(chisqdir + '/chisq{}{}'.format(repr(self), iteration if iteration is not None else ''), k1s=kk1s, k2s=kk2s, chisq=cchisq)
 
     def _handle_fd3_output(self, wd):
         x = np.loadtxt(wd + '/products{}.mod'.format(repr(self))).T
         x[0] = np.exp(x[0])
-        error = np.average(self.noises)
-        # np.savetxt(wd + '/primary.txt', np.array([x[0], x[1], error * np.ones(len(x[1]))]).T)
-        # np.savetxt(wd + '/secondary.txt', np.array([x[0], x[2], error * np.ones(len(x[2]))]).T)
         x[1] *= self.lfs[0]
         x[2] *= self.lfs[1]
-        inds = abs(x[1] + x[2] - 1) < 0.02
+        # plt.plot(x[0], x[1])
+        # plt.plot(x[0], x[2])
+        # plt.show()
+        # print(x[0], x[1])
+        inds = abs(x[1] + x[2] - 1) < 1.05 * max(self.noises)
+        # plt.plot(x[0][inds], np.zeros(len(x[0][inds])), 'ro')
         x_avg = (x[1][inds] + 1 - x[2][inds]) / 2
-        spline = spint.UnivariateSpline(x[0][inds], x_avg, s=0.05)
+        spline = spint.UnivariateSpline(x[0][inds], x_avg, s=0.4)
+        # plt.plot(x[0], spline(x[0]))
+        # plt.show()
         x1 = x[1] - spline(x[0])
         x2 = x[2] - 1 + spline(x[0])
         self.prim = np.array([x[0], x1 / self.lfs[0] + 1]).T
         self.sec = np.array([x[0], x2 / self.lfs[1] + 1]).T
-        np.savetxt(wd + '/{}primary_norm.txt'.format(repr(self)),
-                   np.array([x[0], x1 / self.lfs[0] + 1, error * np.ones(len(x[1]))]).T)
-        np.savetxt(wd + '/{}secondary_norm.txt'.format(repr(self)),
-                   np.array([x[0], x2 / self.lfs[1] + 1, error * np.ones(len(x[2]))]).T)
+        # plt.plot(x[0], x1 / self.lfs[0] + 1)
+        # plt.plot(x[0], x2 / self.lfs[1] + 1)
+        # plt.show()
+        errorp = np.std(self.prim[:20])
+        errors = np.std(self.sec[:20])
+        np.savetxt(wd + '/{}primary.txt'.format(repr(self)), np.array([x[0], x[1], errorp * np.ones(len(x[1]))]).T)
+        np.savetxt(wd + '/{}secondary.txt'.format(repr(self)), np.array([x[0], x[2], errors * np.ones(len(x[2]))]).T)
+        np.savetxt(wd + '/{}primary_norm.txt'.format(repr(self)), np.array([x[0], x1 / self.lfs[0] + 1, errorp * np.ones(len(x[1]))]).T)
+        np.savetxt(wd + '/{}secondary_norm.txt'.format(repr(self)), np.array([x[0], x2 / self.lfs[1] + 1, errors * np.ones(len(x[2]))]).T)
 
     def recombine_and_renorm(self):
         avres = np.zeros(self.no_used_spectra)
@@ -327,10 +319,8 @@ class Fd3class:
     def _get_residual_and_norm(self, i):
         phase = np.remainder((self.mjds[i] - self.orb[1]) / self.orb[0], 1)
         t = self.true_anom(phase)
-        rvk1 = - self.k1 * (np.cos(t + np.pi / 180 * self.orb[3]) + self.orb[2] * np.cos(
-            np.pi / 180 * self.orb[3]))
-        rvk2 = self.k2 * (np.cos(t + np.pi / 180 * self.orb[3]) + self.orb[2] * np.cos(
-            np.pi / 180 * self.orb[3]))
+        rvk1 = - self.orb[4] * (np.cos(t + np.pi / 180 * self.orb[3]) + self.orb[2] * np.cos(np.pi / 180 * self.orb[3]))
+        rvk2 = self.orb[5] * (np.cos(t + np.pi / 180 * self.orb[3]) + self.orb[2] * np.cos(np.pi / 180 * self.orb[3]))
         shifted_primary_spline = spint.splrep(doppler_shift(self.prim[:, 0], rvk1), self.prim[:, 1])
         shifted_secondary_spline = spint.splrep(doppler_shift(self.sec[:, 0], rvk2), self.sec[:, 1])
         resamp_shifted_primary = spint.splev(self.linbase, shifted_primary_spline)
@@ -339,6 +329,15 @@ class Fd3class:
         reconstructees = self.lfs[0] * resamp_shifted_primary + self.lfs[1] * resamp_shifted_secondary
         residual = resamp_composite - reconstructees
         ll = len(residual)
+        if i == np.int(self.no_used_spectra / 2):
+            print(i)
+            plt.title('k2 = {}'.format(self.orb[5]))
+            plt.plot(self.linbase, reconstructees, label='reconstruction')
+            plt.plot(self.linbase, resamp_shifted_primary, label='primary')
+            plt.plot(self.linbase, resamp_shifted_secondary, label='secondary')
+            plt.plot(self.linbase, resamp_composite, label='composite')
+            plt.legend()
+            plt.show()
 
         def corr(x):
             yleft = np.average(residual[:int(np.floor(0.1 * ll))])
@@ -363,9 +362,11 @@ class Fd3class:
         # # plt.plot(self.linbase, residual)
         return residual
 
-    def plot_fd3_results(self, ax=plt.gca()):
-        ax.plot(self.prim[:, 0], self.prim[:, 1], 'b')
-        ax.plot(self.sec[:, 0], self.sec[:, 1], 'r')
+    def plot_fd3_results(self, ax=plt.gca(), offset=0):
+        ax.plot(self.sec[:, 0], self.sec[:, 1], 'r', label='secondary')
+        ax.plot(self.prim[:, 0], self.prim[:, 1] + offset, 'b', label='primary + {}'.format(offset))
+        ax.grid()
+        ax.legend()
 
 
 class GridFd3MCThread(threading.Thread):
@@ -391,6 +392,7 @@ class GridFd3MCThread(threading.Thread):
             os.mkdir(self.wd)
         except FileExistsError:
             pass
+
         # create k1file, k2flie to put them empty if they existed
         # with open(self.wd + '/k1file', 'w'), open(self.wd + '/k2file', 'w'):
         #     pass
@@ -409,8 +411,7 @@ class GridFd3MCThread(threading.Thread):
             for ffd3line in self.fd3gridlines:
                 ffd3line.run_gridfd3(self.wd, ii + 1)
             print('estimated time to completion of thread {}: {}h'.format(self.threadno,
-                                                                          (time.time() - self.threadtime) * (
-                                                                                  self.iterations - ii - 1) / 3600))
+                                                                          (time.time() - self.threadtime) * (self.iterations - ii - 1) / 3600))
 
 
 class GridFd3Thread(threading.Thread):

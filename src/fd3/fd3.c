@@ -14,7 +14,7 @@
 
 #include "../mxfuns.h"
 #include "fd3sep.h"
-#include "triorb.h"
+#include "../triorb.h"
 
 /*****************************************************************************/
 
@@ -34,6 +34,7 @@ void fdbfailure(void) { exit ( EXIT_FAILURE ); }
 /*****************************************************************************/
 
 #define SPEEDOFLIGHT 299792.458 /* speed of light in km/s */
+#define TRIORB_NP 13
 
 static char *triorb_strings[] = {
         /*  0 */  "period of AB--C",                    "day", "%.9lg",
@@ -181,154 +182,29 @@ int main ( void ) {
         printf ( " +/- " );
         GETDBL(dop0+i); printf ( triorb_pformat(i), *(dop0+i) );
         if ( *(dop0+i) ) { opsw[nfp++] = i; printf ( " *** free ***" ); }
-        if ( 2 == i || 8 == i ) *(op0+i) = *(op0+i) / (1-*(op0+i)); /* ecc */
         printf ( "\n" );
     }
     printf ( "\n  number of free orbital parameters is %ld\n", nfp );
 
     printf ( "\n  SECTION 6: OPTIMISATION DETAILS\n\n" );
-    if ( 0 == nfp ) {
-        printf ( "  WARNING: *** no free orbital parameters *** \n" );
-        printf ( "  optimisation of orb. parameters will not be performed\n" );
-        printf ( "  all input in this section is ignored\n\n" );
-    }
-    GETLNG( &nruns );
-    printf ( "  number of independent optimisation runs = %ld\n", nruns );
-    GETLNG( &niter );
-    printf ( "  number of allowed iterations per run = %ld\n", niter );
-    GETDBL( &stoprat );
-    printf ( "  stop when simplex shrinked by factor = %lg\n", stoprat );
+    printf ( "no optimisation possible in this build, only separation\n");
 
+    printf ( "\n  SECTION 7: Separation\n\n" );
 
-    printf ( "\n  SECTION 7: OPTIMISATION\n\n" );
+    double chi2;
 
-    if ( 0 == nfp ) {                                            /* separation */
-
-        double chi2;
-
-        printf ( "  WARNING: *** no free orbital parameters *** \n" );
-        chi2 = meritfn ( op0 );
-        printf ( "  separation at the starting point:  chi2=%lg  gof=%.2lf\n",
-                 chi2, gsl_sf_gamma_inc_Q ( N*(M-K)/2.0, chi2/2.0 ) );
-        dft_bck ( K, N, dftmod, mod+1 ); MxWrite ( mod, K+1, N, modfn );
-        dft_bck ( M, N, dftres, res+1 ); MxWrite ( res, M+1, N, resfn );
-        MxWrite( rvm, K, M, rvsfn );
-
-    } else {                                                  /* disentangling */
-
-        const gsl_multimin_fminimizer_type *T = gsl_multimin_fminimizer_nmsimplex;
-        gsl_multimin_fminimizer *s = NULL; gsl_multimin_function minex_func;
-        gsl_vector *ss, *x;
-        size_t i;
-        int status, iter = 0, irun = 0;
-        double size0 = 1.0, size, chi2;
-        const gsl_rng_type * R; gsl_rng * r;
-
-        gsl_rng_env_setup (); R = gsl_rng_default; r = gsl_rng_alloc (R);
-
-        minex_func.f = &meritfngsl;
-        minex_func.n = nfp;
-        minex_func.params = (void *) NULL;
-
-        s = gsl_multimin_fminimizer_alloc (T, nfp);
-        x  = gsl_vector_alloc (nfp); /* starting point */
-        ss = gsl_vector_alloc (nfp); /* initial vertex size vector */
-
-        for ( i = 0 ; i < nfp ; i++ ) {
-            gsl_vector_set ( x, i, op0[opsw[i]] );
-            gsl_vector_set ( ss, i, dop0[opsw[i]] );
-            size0 *= dop0[opsw[i]];
-        }
-
-        chi2 = meritfngsl ( x, NULL );
-        printf ( "  separation at the starting point:  chi2=%lg  gof=%.2lf\n",
-                 chi2, gsl_sf_gamma_inc_Q ( N*(M-K)/2.0, chi2/2.0 ) );
-        dft_bck ( K, N, dftmod, mod+1 ); MxWrite ( mod, K+1, N, modfn );
-        dft_bck ( M, N, dftres, res+1 ); MxWrite ( res, M+1, N, resfn );
-        MxWrite( rvm, K, M, rvsfn );
-
-        printf
-                ( "  converged disentangling runs reported only if chi2 decreases\n" );
-
-        for ( irun = 0 ; irun < nruns ; irun++ )  {
-
-            for ( i = 0 ; i < nfp ; i++ ) {
-                double tmp = 2.0 * ( gsl_rng_uniform (r) - 0.5 );
-                gsl_vector_set ( x,  i, op0[opsw[i]] + tmp * dop0[opsw[i]] );
-                gsl_vector_set ( ss, i, dop0[opsw[i]] );
-            }
-
-            gsl_multimin_fminimizer_set ( s, &minex_func, x, ss );
-            status = GSL_FAILURE; size = size0;
-
-            for ( iter = 0 ; iter < niter ; iter++ ) {
-                if ( gsl_multimin_fminimizer_iterate (s) ) break;
-                size = gsl_multimin_fminimizer_size (s);
-                status = gsl_multimin_test_size (size, stoprat*size0);
-                if ( GSL_SUCCESS == status ) break;
-            }
-
-            if ( (GSL_SUCCESS == status) && (s->fval < chi2) ) {
-                printf ( "\n  irun=%d  iter=%d  sxshrnkf=%.2lg  chi2=%lg  ",
-                         irun+1, iter, size/size0, chi2 = s->fval );
-                printf ( "gof=%.2lf\n",
-                         gsl_sf_gamma_inc_Q ( (N*(M-K)-nfp)/2.0, chi2/2.0 ) );
-                for ( i = 0 ; i < nfp ; i++ ) {
-                    double xi = gsl_vector_get (s->x, i);
-                    if ( 2 == opsw[i] || 8 == opsw[i] ) xi = fabs ( xi / (1 + xi) );
-                    printf ( "  %40s = ", triorb_pname(opsw[i]) );
-                    printf ( triorb_pformat(opsw[i]), xi );
-                    if ( strcmp ( triorb_punit(opsw[i]), "1" ) )
-                        printf ( " %s", triorb_punit(opsw[i]) );
-                    printf ( "\n" );
-                }
-                dft_bck ( K, N, dftmod, mod+1 ); MxWrite ( mod, K+1, N, modfn );
-                dft_bck ( M, N, dftres, res+1 ); MxWrite ( res, M+1, N, resfn );
-                MxWrite( rvm, K, M, rvsfn );
-            }
-
-            if ( (GSL_SUCCESS == status) && strlen ( logfn ) ) {
-                fprintf ( logfp, "%d  %d  %.2lg  %lg  ",
-                          irun+1, iter, size/size0, s->fval );
-                fprintf ( logfp, "%.2lf  ",
-                          gsl_sf_gamma_inc_Q ( (N*(M-K)-nfp)/2.0, (s->fval)/2.0 ) );
-                for ( i = 0 ; i < nfp ; i++ ) {
-                    double xi = gsl_vector_get (s->x, i);
-                    if ( 2 == opsw[i] || 8 == opsw[i] ) xi = fabs ( xi / (1 + xi) );
-                    fprintf ( logfp, "  " );
-                    fprintf ( logfp, triorb_pformat(i), xi );
-                }
-                fprintf ( logfp, "\n" );
-            }
-
-        }
-
-        gsl_multimin_fminimizer_free (s);
-        gsl_vector_free(x);
-        gsl_vector_free(ss);
-
-        printf ( "\n  completed %ld optimisation runs\n\n", nruns );
-
-    }
+    printf ( "  WARNING: *** no free orbital parameters *** \n" );
+    chi2 = meritfn ( op0 );
+    printf ( "  separation at the starting point:  chi2=%lg  gof=%.2lf\n",
+             chi2, gsl_sf_gamma_inc_Q ( N*(M-K)/2.0, chi2/2.0 ) );
+    dft_bck ( K, N, dftmod, mod+1 ); MxWrite ( mod, K+1, N, modfn );
+    dft_bck ( M, N, dftres, res+1 ); MxWrite ( res, M+1, N, resfn );
+    MxWrite( rvm, K, M, rvsfn );
 
     printf ( "  EXITING REGULARLY\n\n" );
 
     return EXIT_SUCCESS;
 
-}
-
-/*****************************************************************************/
-
-double meritfngsl ( const gsl_vector *v, void *params )
-{
-
-    long i, j;
-    double op[TRIORB_NP];
-
-    for ( i = j = 0 ; i < TRIORB_NP ; i++ )
-        op[i] = dop0[i] ? gsl_vector_get ( v, j++ ) : op0[i];
-
-    return meritfn ( op );
 }
 
 /*****************************************************************************/
@@ -341,13 +217,13 @@ double meritfn ( double *opin )
 
     op[ 0] = opin[ 0];
     op[ 1] = opin[ 1];
-    op[ 2] = fabs ( opin[2] / (1 + opin[2]) );
+    op[ 2] = opin[ 2];
     op[ 3] = opin[ 3] * (M_PI/180);
     op[ 4] = opin[ 4];
     op[ 5] = opin[ 5];
     op[ 6] = opin[ 6];
     op[ 7] = opin[ 7];
-    op[ 8] = fabs ( opin[8] / (1 + opin[8]) );
+    op[ 8] = opin[ 8];
     op[ 9] = opin[ 9] * (M_PI/180);
     op[10] = opin[10] / rvstep;
     op[11] = opin[11] / rvstep;

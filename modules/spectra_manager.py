@@ -5,7 +5,7 @@ import scipy.interpolate as spint
 
 class SpectrumError(Exception):
     """
-    internal exception when something goes wrong loading spectra
+    Exception when something goes wrong loading spectra
     """
 
     def __init__(self, file, line, msg):
@@ -39,8 +39,13 @@ def getspectrum(line, file, lambdabase, edgepoints=20):
             raise SpectrumError(file, line, 'has no spline')
         # append in base evaluated flux values
         flux = spint.splev(lambdabase, logspline.data[0])
+        if np.average(flux) < 0.1:
+            raise SpectrumError(file, line, 'average flux is low here, might be a gap in the spectrum, skipping')
         # determine noise near this line
-        noise = np.std(flux[:edgepoints-1])
+        noise = np.std(flux[:edgepoints - 1])
+        if np.isnan(noise):
+            print(file, line)
+            print(flux[:edgepoints - 1])
         # get mjd
         mjd = hdul[0].header['MJD-obs']
         return flux, noise, mjd

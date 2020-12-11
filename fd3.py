@@ -1,15 +1,25 @@
+"""
+User script showing the typical use case for broad range fd3 separation.
+First a list of files containing the relevant spectra is globbed.
+Next, we specify the orbital parameters and the RV semi-amplitudes and various other
+parameters such as the sampling rate and light factors
+"""
 import glob
 import pathlib
 import time
-
 import matplotlib.pyplot as plt
-
-import outfile_analyser as oa
 import modules.gridfd3classes as fd3classes
 
 # input
-obj = '9_Sgr'  # folder name for your run_fd3, can be anything you want
-spectra_set = ['9_Sgr']  # allows for subsetting spectra
+# define working directories
+obj = '9_Sgr'
+# gridfd3folder = obj + '/' + str(datetime.today().strftime('%y%m%dT%H%M%S'))
+gridfd3folder = obj
+fd3folder = gridfd3folder + '/fd3'
+
+# find locations of your spectra
+spectra_set = ['9_Sgr'
+               ]  # allows for subsetting spectra
 try:
     spec_folder = list()
     for folder in spectra_set:
@@ -21,22 +31,19 @@ except IndexError:
     exit()
 
 # geometrical orbit elements and its error. error is ignored if not monte_carlo
-orbit = (3261, 56547, 0.648, 30.7)  # p, t0, e, omega(A)
-k1 = 33
-k2 = 51
-
-# do you want a (static) third component to be found?
-thirdlight = False
+orbit = (3251, 56547, 0.648, 30.9, 31.0, 52.0)  # p, t0, e, omega(A), K1, K2
 
 # lightfactors of your components (if thirdlight, give three)
-lfs = [0.6173, 0.3827]
+lfs = [0.57, 0.43]
+# do you want a (static) third component to be found?
+thirdlight = False
 
 # sampling of your spectra in angstrom
 sampling = 0.03
 
 # enter wavelength range(s) in natural log of wavelength and give name of line. Must be a dict.
 lines = dict()
-lines['range'] = (4000, 6800)
+lines['range'] = (4010, 6800)
 ############################################################
 
 
@@ -76,14 +83,12 @@ if K == 0:
     print('no lines selected')
     exit()
 
-fd3folder = obj + '/fd3'
+
 pathlib.Path(fd3folder).mkdir(parents=True, exist_ok=True)
 
 # save the run_fd3 parameters for later reference
 with open(fd3folder + "/params.txt", 'w') as paramfile:
     paramfile.write('orbit\t' + str(orbit) + '\n')
-    paramfile.write('k1\t' + str(k1) + '\n')
-    paramfile.write('k2\t' + str(k2) + '\n')
     paramfile.write('lightfactors\t' + str(lfs) + '\n')
     paramfile.write('sampling\t' + str(sampling) + '\n')
     paramfile.write('spectra\t' + str(spectra_set) + '\n')
@@ -93,7 +98,7 @@ print('building fd3gridline object for:')
 for line in lines.keys():
     print(' {}'.format(line))
     fd3lineobjects.append(
-        fd3classes.Fd3class(line, lines[line], sampling, allfiles, thirdlight, lfs, orbit, k1=k1, k2=k2))
+        fd3classes.Fd3class(line, lines[line], sampling, allfiles, thirdlight, orbit, lfs=lfs))
 
 d3threads = list()
 setuptime = time.time()
@@ -101,10 +106,12 @@ print('setup took {}s\n'.format(setuptime - starttime))
 print('starting runs!')
 now = time.time()
 for line in fd3lineobjects:
-    d3threads.append(fd3classes.Fd3Thread(fd3folder, line))
-run_join_threads(d3threads)
+    line.run_fd3(fd3folder)
 for line in fd3lineobjects:
-    line.plot_fd3_results()
+    # line.recombine_and_renorm()
+    plt.title('k2 = {}'.format(orbit[5]))
+    line.plot_fd3_results(offset=0.0)
+
 
 print('Thanks for your patience! You waited a whopping {} hours!'.format((time.time() - starttime) / 3600))
 plt.show()

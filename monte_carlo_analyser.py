@@ -1,3 +1,6 @@
+"""
+Takes a single folder as a runtime argument
+"""
 import glob
 import sys
 import os

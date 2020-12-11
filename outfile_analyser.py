@@ -1,7 +1,8 @@
+import glob
+
 import numpy as np
 import scipy.optimize as spopt
 import scipy.special as sps
-import glob
 
 
 def file_parser(ffile):
@@ -20,7 +21,7 @@ def file_parser(ffile):
     return kk1s, kk2s, cchisqhere
 
 
-def plot_contours(ffig, kk1s, kk2s, cchisq, ddof):
+def plot_contours(ffig, kk1s, kk2s, cchisq, ddof, error=False):
     """
     plots the reduced chisq contours on a figure
     :param ffig: figure to plot on
@@ -32,8 +33,21 @@ def plot_contours(ffig, kk1s, kk2s, cchisq, ddof):
     """
     aax = ffig.add_subplot(111)
     k2grid, k1grid = np.meshgrid(kk2s, kk1s)
-    contour = aax.contourf(k1grid, k2grid, cchisq / ddof, levels=50, cmap='inferno')
-    ffig.colorbar(contour, ax=aax)
+    cont = aax.contourf(k1grid, k2grid, cchisq / ddof, levels=10, cmap='inferno')
+    if error:
+        factor = np.min(cchisq) / ddof
+        p = 1 - sps.gammainc(ddof / 2, (cchisq / factor) / 2)
+
+        def onesigma(ccchisq):
+            """
+            defines the one sigma level
+            :param ccchisq: chisqs
+            :return: 1sig level chisq
+            """
+            return 0.683 - sps.gammainc(ddof / 2, (ccchisq / factor) / 2)
+        print(rt := spopt.root_scalar(onesigma, x0=np.min(cchisq), bracket=[np.min(cchisq), np.max(cchisq)]).root / ddof)
+        aax.contour(k1grid, k2grid, p, levels=[rt], colors='red')
+        ffig.colorbar(cont, ax=aax)
     return aax
 
 
@@ -73,12 +87,10 @@ def plot_oneDee(ffig, ks, cchisq, ddof, num):
     try:
         axx.hlines(onesigma / ddof, ks[0], ks[-1], colors='r')
         axx.text(np.min(ks), (np.max(cchisq) + np.min(cchisq)) / ddof / 2,
-                 r'$K_{} = {}^{{+ {}}}_{{- {}}}$'.format(num, minimum, np.round(plus - minimum, 2),
-                                                         np.round(minimum - mins, 2)))
+                 r'$K_{} = {}^{{+ {}}}_{{- {}}}$'.format(num, minimum, np.round(plus - minimum, 2), np.round(minimum - mins, 2)))
     except TypeError as ee:
         print(ee, 'cannot plot errors if they dont exist')
-        axx.text(np.min(ks), (np.max(chisq) + np.min(chisq)) / ddof / 2,
-                 'error outside grid')
+        axx.text(np.min(ks), (np.max(chisq) + np.min(chisq)) / ddof / 2, 'error outside grid')
     return axx
 
 
@@ -191,7 +203,7 @@ def get_min_and_plot(kk1s, kk2s, cchisq, ddof, name):
 
         fig = plt.figure(figsize=(4, 6))
         ax = plot_oneDee(fig, kk1s, cchisq[:, idx[1]], ddof, 1)
-        ax.set_title(r"$\chi^2_{\textrm{red}} " + name)
+        ax.set_title(r"$\chi^2_{\textrm{red}}$ " + name)
         ax.set_xlabel(r'$K_1(\si{\km\per\second})$')
         ax.set_ylabel(r'$\chi_{\textrm{red}}^2$')
         # plt.grid()
@@ -201,7 +213,7 @@ def get_min_and_plot(kk1s, kk2s, cchisq, ddof, name):
 
         fig = plt.figure(figsize=(4, 6))
         ax = plot_oneDee(fig, kk2s, cchisq[idx[0], :], ddof, 2)
-        ax.set_title(r"$\chi^2_{\textrm{red}} " + name)
+        ax.set_title(r"$\chi^2_{\textrm{red}}$ " + name)
         ax.set_xlabel(r'$K_2(\si{\km\per\second})$')
         ax.set_ylabel(r'$\chi_{\textrm{red}}^2$')
         # plt.grid()
@@ -239,106 +251,39 @@ if __name__ == "__main__":
     import sys
 
     folder = sys.argv[1]
-
-    Hs = dict()
-    Hs['Hdelta'] = (8.3155, 8.3215)
-    Hs['Hgamma'] = (8.3720, 8.3785)
-    Hs['Hbeta'] = (8.4850, 8.4925)
-    # Hs['Halpha'] = (8.7865, 8.7920)
-    Hs['name'] = 'H'
-
-    # metals = dict()
-    # metals['FeII4584'] = (8.4292, 8.4316)
-    # metals['FeII5167'] = (8.5494, 8.5514)
-    # metals['FeII5198'] = (8.5549, 8.5568)
-    # metals['FeII5233'] = (8.5620, 8.5640)
-    # metals['FeII5276'] = (8.5699, 8.5717)
-    # metals['FeII5316+SII5320'] = (5310, 5325)
-    # metals['FeII5362'] = (8.5865, 8.5872)
-    # metals['OIII5592'] = (5584, 5600)
-    # metals['CIII5696'] = (5680, 5712)
-    # metals['FeII5780'] = (5770, 5790)
-    # metals['CIV5801+12'] = (5798, 5817)
-    # metals['name'] = 'metals'
-
-    HeIs = dict()
-    # Hes['HeI4009'] = (8.2945, 8.2980)
-    # HeIs['HeI+II4026'] = (8.2985, 8.3025)
-    # HeIs['HeI4121'] = (8.3226, 8.3247)
-    # HeIs['HeI4143'] = (8.3280, 8.3305)
-    # HeIs['HeI4387'] = (8.3855, 8.3875)
-    # HeIs['HeI4471'] = (8.4045, 8.4065)
-    # HeIs['HeI4713'] = None
-    # HeIs['HeI5016'] = None
-    HeIs['HeI5875'] = None
-    # HeIs['HeI6678'] = None
-    HeIs['name'] = 'HeI'
-
-    HeIIs = dict()
-    HeIIs['HeII4200'] = None
-    HeIIs['HeII4541'] = None
-    HeIIs['HeII4686'] = None
-    HeIIs['HeII5411'] = None
-    HeIIs['name'] = 'HeII'
-
-    groups = list()
-    groups.append(Hs)
-    # groups.append(Fes)
-    groups.append(HeIs)
-    groups.append(HeIIs)
-
-    alll = dict()
-    alll['name'] = 'all'
-    for lines in groups:
-        for line in lines.keys():
-            if line == 'name':
-                continue
-            alll[line] = lines[line]
-    groups.append(alll)
-
-    for lines in groups:
+    lines = glob.glob(folder + '/chisqs/chisq*')
+    for i in range(len(lines)):
+        lines[i] = lines[i].rsplit('.', maxsplit=1)[0].rsplit('chisq', maxsplit=1)[-1]
+    totdof = 0
+    totchisq = 0
+    for line in lines:
         chisqfiles = list()
         infiles = list()
         # find all files present
-        for line in lines.keys():
-            if line == 'name':
-                continue
-            print('finding', line, '...')
-            try:
-                chisqfiles.append(glob.glob(folder + '/chisqs/chisq{}.npz'.format(line))[0])
-            except IndexError as e:
-                print(e, 'cannot find {}'.format(line))
-                continue
-            infiles.append(glob.glob(folder + '/in{}'.format(line))[0])
+        print('finding', line, '...')
+        try:
+            chisqfiles.append(glob.glob(folder + '/chisqs/chisq{}.npz'.format(line))[0])
+        except IndexError as e:
+            print(e, 'cannot find {}'.format(line))
+            continue
+        infiles.append(glob.glob(folder + '/in{}'.format(line))[0])
         # of those present, add dof
         if len(infiles) == 0:
             continue
         dof = 0
         for file in infiles:
             with open(file) as f:
-                dof += int(f.readlines()[-1])
+                dofhere = int(f.readlines()[-1])
+                dof += dofhere
+                totdof += dofhere
         # parse first file
         k1s, k2s, chisq = file_parser(chisqfiles[0])
+        totchisq += chisq
         # add up chisq
         for i in range(1, len(chisqfiles)):
             _, _, chisqhere = file_parser(chisqfiles[i])
             chisq += chisqhere
         # print its minimum
-        get_min_and_plot(k1s, k2s, chisq, dof, lines['name'])
-
-        # construct individual line plots
-        if lines['name'] == 'all':
-            continue  # don't do this for the 'all' line group
-        for line in lines.keys():
-            if line == 'name':
-                continue
-            try:
-                chisqfile = glob.glob(folder + '/chisqs/chisq{}.npz'.format(line))[0]
-            except IndexError as e:
-                print(e, 'cannot find {}'.format(line))
-                continue
-            infile = glob.glob(folder + '/in{}'.format(line))[0]
-            with open(infile) as f:
-                dof = int(f.readlines()[-1])
-            k1s, k2s, chisq = file_parser(chisqfile)
-            get_min_and_plot(k1s, k2s, chisq, dof, line)
+        get_min_and_plot(k1s, k2s, chisq, dof, line)
+    # get the aggregate chisq plot
+    get_min_and_plot(k1s, k2s, totchisq, totdof, 'all')

@@ -1,9 +1,7 @@
-
 #include <math.h>
 #include <stdlib.h>
 
 #include "fd3sep.h"
-/* #include "mxfuns.h" */
 
 #include <gsl/gsl_linalg.h>
 #include <gsl/gsl_matrix.h>

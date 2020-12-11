@@ -9,4 +9,7 @@ temp
 LB-1/
 bin/
 HR_6819*
+BH_project/
 **.o
+*.png
+HD*/
