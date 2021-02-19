@@ -15,10 +15,9 @@ import modules.gridfd3classes as fd3classes
 
 # input
 # define working directories
-obj = '9_Sgr/testgamma'
+obj = '9_Sgr/resub6'
 # gridfd3folder = obj + '/' + str(datetime.today().strftime('%y%m%dT%H%M%S'))
 gridfd3folder = obj
-fd3folder = gridfd3folder + '/fd3'
 
 # find locations of your spectra
 spectra_set = ['9_Sgr']  # allows for subsetting spectra
@@ -33,18 +32,17 @@ except IndexError:
     exit()
 
 # geometrical orbit elements and its error. error is ignored if not monte_carlo
-orbit = (3261, 56547, 0.648, 30.8, -5)  # p, t0, e, omega(A), Delta\gamma
+orbit = (3261, 56547, 0.648, 30.7)  # p, t0, e, omega(A)
 
 # K1 and K2 ranges to be explored, in string form: 'left right step', all in km/s
 k1str = '15 45 1'
-k2str = '40 65 1'
+k2str = '35 65 1'
 
 # light factors of your components (if thirdlight, give three)
-lfs = [0.57, 0.43]
+lfs = [0.6173, 0.3827]
 
 # Indicate if you want the model spectra to be computed
 back = False
-
 
 # these are the full reported MCMC errors
 # orbit_err = np.array([[68, 12, 0.009, 2.3]])  # make this 2D so we can transpose if needed
@@ -66,43 +64,43 @@ back = False
 thirdlight = False
 
 # sampling of your spectra in angstrom
-sampling = 0.03
+sampling = 0.07
 
 # enter wavelength range(s) in natural log of wavelength and give name of line. Must be a dict.
 lines = dict()
 # lines['HeI4009'] = (4002, 4016)
-# lines['HeI+II4026'] = (4016, 4035)
+# lines['HeI+II4026'] = (4020, 4031)
 # lines['NIV4058'] = (4050, 4065)
 # lines['SiIV4089'] = (4086, 4092)
-lines['Hdelta'] = (4085, 4120)
+lines['Hdelta'] = (4091.8, 4112.5)
 # lines['SiIV4116'] = (4113, 4118)
 # lines['HeI4121'] = (4114, 4127)
 # lines['HeI4143'] = (4135, 4152)
-lines['HeII4200'] = (4188, 4212)
-lines['Hgamma'] = (4320, 4355)
-# lines['NIII4379'] = (4370, 4384)
-# lines['HeI4387'] = (4380, 4395)
-# lines['HeI4471'] = (4465, 4478)
-lines['HeII4541'] = (4530, 4553)
+lines['HeII4200'] = (4193, 4206)
+lines['Hgamma'] = (4327.8, 4354.5)
+# lines['NIII4379'] = (4376, 4384)
+# lines['HeI4387'] = (4384, 4392)
+# lines['HeI4471'] = (4465, 4475.3)
+lines['HeII4541'] = (4532.5, 4550)
 # lines['FeII4584'] = (4578, 4589)
 # lines['CIII4650'] = (4625, 4660)
-lines['HeII4686'] = (4676, 4694)
-# lines['HeI4713'] = (4704, 4720)
-lines['Hbeta'] = (4843, 4877)
-# lines['HeI4922'] = (4913, 4930)
-# lines['HeI5016'] = (5001, 5025)
+lines['HeII4686'] = (4677, 4692)
+# lines['HeI4713'] = (4710, 4716)
+lines['Hbeta'] = (4841.6, 4878)
+# lines['HeI4922'] = (4917, 4927)
+# lines['HeI5016'] = (5011, 5026)
 # lines['FeII5167'] = (5162, 5175)
 # lines['FeII5198'] = (5190, 5205)
 # lines['FeII5233'] = (5225, 5238)
 # lines['FeII5276'] = (5270, 5282)
 # lines['FeII5316+SII5320'] = (5310, 5325)
 # lines['FeII5362'] = (5356, 5368)
-lines['HeII5411'] = (5397, 5425)
+lines['HeII5411'] = (5399.2, 5424.1)
 # lines['OIII5592'] = (5583, 5600)
 # lines['CIII5696'] = (5680, 5712)
 # lines['FeII5780'] = (5774, 5787)
-# lines['CIV5801+12'] = (5798, 5817)
-lines['HeI5875'] = (5864, 5884)
+# lines['CIV5801+12'] = (5797.8, 5815.7)
+# lines['HeI5875'] = (5871, 5879.5)
 # lines['Halpha'] = (6550, 6578)
 # lines['HeI6678'] = (6667, 6700)
 # lines['OI8446'] = (8437, 8455)
@@ -167,7 +165,7 @@ if pathlib.Path(gridfd3folder + '/chisqs').exists():
     for file in glob.glob(gridfd3folder + '/chisqs/**'):
         os.remove(file)
 
-pathlib.Path(fd3folder).mkdir(parents=True, exist_ok=True)
+pathlib.Path(gridfd3folder).mkdir(parents=True, exist_ok=True)
 # save the run_fd3 parameters for later reference
 with open(gridfd3folder + "/params.txt", 'w') as paramfile:
     paramfile.write('orbit\t' + str(orbit) + '\n')
@@ -193,43 +191,12 @@ for line in lines.keys():
 print('building threads')
 cpus = os.cpu_count()
 gridthreads = list()
-d3threads = list()
 
-
-# method for clearing the list of threads and populating them with fresh ones to be run anew
-def new_threads():
-    d3threads.clear()
-    gridthreads.clear()
-    for ffd3line in fd3lineobjects:
-        gridthreads.append(fd3classes.GridFd3Thread(gridfd3folder, ffd3line))
-        d3threads.append(fd3classes.Fd3Thread(fd3folder, ffd3line))
-
-
-# actually make new threads
-new_threads()
+for ffd3line in fd3lineobjects:
+    gridthreads.append(fd3classes.GridFd3Thread(gridfd3folder, ffd3line))
 setuptime = time.time()
 print('setup took {}s\n'.format(setuptime - starttime))
-# start the gridfd3 runs, do i iterations of grid disentangling, normal fd3 separation and normalization of the
-# separated lines
 print('starting runs!')
-i = 0
 now = time.time()
-# run gridfd3
 run_join_threads(gridthreads)
-print('run {} done in {}h'.format(i + 1, (time.time() - now) / 3600))
-# mink1, mink2 = oa.get_min_of_run(gridfd3folder)
-# print('minimum of the last run_fd3 is', mink1, mink2)
-#
-# for fd3line in fd3lineobjects:
-#     fd3line.set_k1(mink1)
-#     fd3line.set_k2(mink2)
-# # run standard fd3
-# run_join_threads(d3threads)
-# # recombine_and_renorm
-# print('renormalizing')
-# for fd3line in fd3lineobjects:
-#     fd3line.recombine_and_renorm()
-# i += 1
-# # reset thread lists with fresh threads
-# new_threads()
 print('Thanks for your patience! You waited a whopping {} hours!'.format((time.time() - starttime) / 3600))

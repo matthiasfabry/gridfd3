@@ -5,7 +5,7 @@ import sys
 import scipy.interpolate as spint
 folder = '9_Sgr/fd3'
 #%%
-lfs = [0.5670995670995671, 0.4329004329004329]
+lfs = [0.62, 0.38]
 thresh = 0.002
 smooth = 0.02
 name = 'range'
@@ -47,7 +47,7 @@ errors = np.std(sec[:20, 1])
 #%%
 np.savetxt(folder + '/{}primary.txt'.format(name), np.array([x[0], x[1], errorp * np.ones(len(x[1]))]).T)
 np.savetxt(folder + '/{}secondary.txt'.format(name), np.array([x[0], x[2], errors * np.ones(len(x[2]))]).T)
-np.savetxt(folder + '/{}finalprimary_norm.txt'.format(name),
+np.savetxt(folder + '/{}primary_norm.txt'.format(name),
        np.array([x[0], x1 / lfs[0] + 1, errorp * np.ones(len(x[1]))]).T)
-np.savetxt(folder + '/{}finalsecondary_norm.txt'.format(name),
+np.savetxt(folder + '/{}secondary_norm.txt'.format(name),
        np.array([x[0], x2 / lfs[1] + 1, errors * np.ones(len(x[2]))]).T)

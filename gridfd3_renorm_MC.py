@@ -16,7 +16,7 @@ import modules.gridfd3classes as fd3classes
 
 # specify working directories, can be anything you want
 obj = '9_Sgr'
-gridfd3folder = obj + '/recombMCcovar'
+gridfd3folder = obj + '/recombMCcovarresub'
 fd3folder = gridfd3folder + '/fd3'
 spectra_set = ['9_Sgr']  # listing allows for subsetting spectra
 
@@ -31,25 +31,25 @@ except IndexError:
     exit()
 
 # K1 and K2 ranges to be explored, in string form: 'left right step', all in km/s
-k1str = '21 41 1'
-k2str = '45 65 1'
+k1str = '15 45 1'
+k2str = '35 65 1'
 
 # Indicate if you want the model spectra to be computed
 back = False
 
 # geometrical orbit elements and its error. error is ignored if not monte_carlo
 orbit = (3261, 56547, 0.648, 30.7)  # p, t0, e, omega(A)
-orbit_err = np.array([[68, 12, 0.009, 2.3]])
+orbit_err = np.array([[69, 12, 0.009, 2.3]])
 
 # optional: correlation matrix of the parameters
 orbit_err_unscale = np.array(
     [[14.2, 2.396, 0.002, 0.452]])  # not properly scaled errors corresponding to the matrix below
-orbit_covar_unscale = np.array(
+orbit_covar_unscale = np.array(  # correlation matrix
     [[2.016706010889813285e+02, 2.650853464144408811e+00, 1.653940436054600338e-02, 1.510087481644369234e+00],
      [2.650853464144408811e+00, 5.739323098131123402e+00, 3.250949346561587527e-03, 1.040789875201268533e+00],
      [1.653940436054600338e-02, 3.250949346561587527e-03, 3.299601439411175585e-06, 6.442714780292257666e-04],
-     [1.510087481644369234e+00, 1.040789875201268533e+00, 6.442714780292257666e-04,
-      2.043357582025700225e-01]])  # correlation matrix
+     [1.510087481644369234e+00, 1.040789875201268533e+00, 6.442714780292257666e-04, 2.043357582025700225e-01]])
+
 
 # scale the matrix to the properly scaled errors 'orbit_err'
 scale = np.matmul((orbit_err / orbit_err_unscale).T, orbit_err / orbit_err_unscale)
@@ -58,7 +58,7 @@ orbit_covar_scale = scale * orbit_covar_unscale
 # monte carlo switches. If monte_carlo, at least one of the others needs to be true.
 # If not monte_carlo, the others are ignored
 monte_carlo = True
-N = 1000
+N = 10
 perturb_orbit = True
 perturb_spectra = True
 
@@ -69,7 +69,7 @@ thirdlight = False
 lfs = [0.6173, 0.3827]
 
 # sampling of your spectra in angstrom
-sampling = 0.075
+sampling = 0.07
 
 # enter wavelength range(s) in angstrom and give name to the line. Must be a dict.
 lines = dict()
@@ -98,7 +98,7 @@ lines['HeII5411'] = (5396.4, 5426.2)
 # lines['CIII5696'] = (5680, 5712)
 # lines['FeII5780'] = (5770, 5790)
 # lines['CIV5801+12'] = (5798, 5817)
-lines['HeI5875'] = (5869.4, 5881.1)
+# lines['HeI5875'] = (5869.4, 5881.1)
 # lines['Halpha'] = (6545, 6580)
 # lines['HeI6678'] = (6674, 6682)
 # lines['OI8446'] = (8437, 8455)
@@ -171,21 +171,22 @@ for line in lines.keys():
 
 # build threads around the lines
 print('building threads')
-cpus = 14
 gridthreads = list()
 d3threads = list()
 for fd3line in fd3lineobjects:
-    fd3line.set_k1(33)
-    fd3line.set_k2(51)
+    fd3line.set_k1(36)
+    fd3line.set_k2(49)
     d3threads.append(fd3classes.Fd3Thread(fd3folder, fd3line))
 
-# do an initial separation to renormalize on, we still consider this
+# do an initial separation to renormalize on
 run_join_threads(d3threads)
 # recombine_and_renorm
 print('renormalizing')
 for fd3line in fd3lineobjects:
     fd3line.recombine_and_renorm()
 
+import os
+cpus = min(os.cpu_count(), N)
 if monte_carlo:
     # create threads
     print('number of threads will be {}'.format(cpus))

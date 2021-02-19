@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.optimize as spopt
 import scipy.stats as stat
-
 import modules.orbitalfunctions as of
 
 
@@ -34,6 +33,19 @@ for folder in folders:
         combsog = np.concatenate((combsog, combshere))
 
 
+def multi_median(ms):
+    x = [point[0] for point in ms]
+    y = [point[1] for point in ms]
+
+    x0 = np.array([sum(x) / len(x), sum(y) / len(y)])
+
+    def dist_func(x0):
+        return sum(((np.full(len(x), x0[0]) - x) ** 2 + (np.full(len(x), x0[1]) - y) ** 2) ** (1 / 2))
+
+    res = spopt.minimize(dist_func, x0, method='nelder-mead', options={'xtol': 1e-8, 'disp': True})
+    return res.x
+
+
 def populate_mass_line(m):
     lst = list()
     for k1 in uk1s:
@@ -49,9 +61,11 @@ def stats(lst, name):
     N = len(lst)
     q1 = lst[int(0.158 * N)]
     q2 = lst[int(0.842 * N)]
-    print(name, 'avg', avg:=np.average(lst))
-    print(name, 'upper 1sigma', q2-avg)
-    print(name, 'lower 1sigma', avg-q1)
+    med = lst[int(0.5*N)]
+    print(name, 'avg', avg := np.average(lst))
+    print(name, 'median', med)
+    print(name, 'upper 1sigma', q2-med)
+    print(name, 'lower 1sigma', med-q1)
     print(name, 'std', np.std(lst))
     print(name, 'mode', stat.mode(lst))
 
@@ -99,18 +113,26 @@ if len(uk1s) != 1:
     plt.close()
     plt.figure()
     plt.grid()
+
     plt.scatter(ucombs[:, 0], ucombs[:, 1], c=num, cmap='inferno', lw=0, s=50)
-    # plt.plot(threelowers[:, 0], threelowers[:, 1], 'b-.', lw=0.5)
-    # plt.plot(lowers[:, 0], lowers[:, 1], 'b--', lw=0.5)
-    # plt.plot(mids[:, 0], mids[:, 1], 'b', lw=1)
-    # plt.plot(uppers[:, 0], uppers[:, 1], 'b--', lw=0.5)
-    # plt.plot(threeuppers[:, 0], threeuppers[:, 1], 'b-.', lw=0.5)
+    plt.colorbar(label=r'$N$')
+    plt.scatter([31], [52], edgecolors='red', facecolors='none', lw=2, s=80, label=r'Original Data')
     plt.xlim((20, 44))
     plt.ylim((45, 62))
-    plt.colorbar()
+    plt.legend()
+
     plt.xlabel(r'$K_1 (\si{\km\per\second})$')
     plt.ylabel(r'$K_2 (\si{\km\per\second})$')
-    plt.savefig(folders[0]+'/k2vsk2.png', dpi=200)
+    plt.savefig(folders[0]+'/k1vsk2.png', dpi=200)
+    plt.close()
+    plt.figure()
+    plt.grid()
+    plt.scatter(mucombs[:, 0], mucombs[:, 1], c=munum, cmap='inferno', lw=0, s=50)
+    plt.colorbar(label=r'$N$')
+
+    plt.xlabel(r'$M_1 ({\rm M}_\odot)$')
+    plt.ylabel(r'$M_2 ({\rm M}_\odot)$')
+    plt.savefig(folders[0]+'/m1vsm2.png', dpi=200)
     plt.close()
 plt.figure()
 plt.hist(np.round(mink2sog, 2), bins=uk2s, align='left', color='r')
@@ -120,6 +142,8 @@ plt.grid()
 plt.tight_layout()
 plt.savefig(folders[0]+'/histk2.png', dpi=200)
 plt.close()
+print(multi_median(combsog))
+print(multi_median(mcombs))
 stats(mink1sog, 'k1')
 stats(mink2sog, 'k2')
 stats(m1s, 'M1')
@@ -171,6 +195,7 @@ if len(uk1s) != 1:
     # plt.plot(mids[:, 0], mids[:, 1], 'b', lw=1)
     # plt.plot(uppers[:, 0], uppers[:, 1], 'b--', lw=0.5)
     # plt.plot(threeuppers[:, 0], threeuppers[:, 1], 'b-.', lw=0.5)
+
     plt.ylim((45, 65))
     plt.colorbar()
     plt.xlabel(r'$K_1 (\si{\km\per\second})$')

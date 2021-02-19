@@ -3,6 +3,9 @@ import glob
 import numpy as np
 import scipy.optimize as spopt
 import scipy.special as sps
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import plotsetup  # noqa
 
 
 def file_parser(ffile):
@@ -21,7 +24,7 @@ def file_parser(ffile):
     return kk1s, kk2s, cchisqhere
 
 
-def plot_contours(ffig, kk1s, kk2s, cchisq, ddof, error=False):
+def plot_contours(ffig, kk1s, kk2s, cchisq, ddof, error=True):
     """
     plots the reduced chisq contours on a figure
     :param ffig: figure to plot on
@@ -33,21 +36,24 @@ def plot_contours(ffig, kk1s, kk2s, cchisq, ddof, error=False):
     """
     aax = ffig.add_subplot(111)
     k2grid, k1grid = np.meshgrid(kk2s, kk1s)
-    cont = aax.contourf(k1grid, k2grid, cchisq / ddof, levels=10, cmap='inferno')
+    cont = aax.contourf(k1grid, k2grid, cchisq / ddof, levels=30, cmap='inferno')
     if error:
-        factor = np.min(cchisq) / ddof
-        p = 1 - sps.gammainc(ddof / 2, (cchisq / factor) / 2)
+        mn = np.min(cchisq)
+        factor = mn / ddof
 
-        def onesigma(ccchisq):
+        def sigma(ccchisq, level):
             """
-            defines the one sigma level
+            defines the sigma levels
             :param ccchisq: chisqs
+            :param level: confidence level required
             :return: 1sig level chisq
             """
-            return 0.683 - sps.gammainc(ddof / 2, (ccchisq / factor) / 2)
-        print(rt := spopt.root_scalar(onesigma, x0=np.min(cchisq), bracket=[np.min(cchisq), np.max(cchisq)]).root / ddof)
-        aax.contour(k1grid, k2grid, p, levels=[rt], colors='red')
-        ffig.colorbar(cont, ax=aax)
+            return level - sps.gammainc(ddof / 2, (ccchisq / factor) / 2)
+        print(ones := spopt.root_scalar(lambda x: sigma(x, 0.683), x0=mn, bracket=[mn, 2 * np.max(cchisq)]).root / ddof)
+        print(twos := spopt.root_scalar(lambda x: sigma(x, 0.955), x0=mn, bracket=[mn, 2 * np.max(cchisq)]).root / ddof)
+        aax.contour(k1grid, k2grid, cchisq / ddof, levels=[ones], colors='red')
+        aax.contour(k1grid, k2grid, cchisq / ddof, levels=[twos], colors='orange')
+    ffig.colorbar(cont, ax=aax)
     return aax
 
 
@@ -183,6 +189,8 @@ def get_min_and_plot(kk1s, kk2s, cchisq, ddof, name):
         fig = plt.figure()
         ax = plot_contours(fig, kk1s, kk2s, cchisq, ddof)
         mark_minimum(ax, kk1s, kk2s, cchisq, r"$\chi^2_{\textrm{red,min}}" + " = {}, {}$".format(minima[0], minima[1]))
+        ax.plot([25.7], [38.8], 'bo', ms=1, label=r'Rauw et al. (2012)')
+        ax.add_artist(mpl.patches.Ellipse((25.7, 38.8), 0.6, 0.9, color='blue', lw=0.5, fill=False))
         ax.legend(loc=2)
         ax.set_title(r"$\chi^2_{\textrm{red}}$ " + name)
         ax.set_xlabel(r'$K_1(\si{\km\per\second})$')
@@ -192,45 +200,45 @@ def get_min_and_plot(kk1s, kk2s, cchisq, ddof, name):
         fig.savefig(folder + '/chisq{}.png'.format(name), dpi=200)
         plt.close(fig)
 
-        fig = plt.figure()
-        ax = plot_uncertainty(fig, kk1s, kk2s, cchisq, ddof)
-        ax.set_title(r'$1-P(\nu/2, \chi^2/2)$ ' + name)
-        ax.set_xlabel(r'$K_1(\si{\km\per\second})$')
-        ax.set_ylabel(r'$K_2(\si{\km\per\second})$')
-        plt.tight_layout()
-        fig.savefig(folder + '/error{}.png'.format(name), dpi=200)
-        plt.close(fig)
-
-        fig = plt.figure(figsize=(4, 6))
-        ax = plot_oneDee(fig, kk1s, cchisq[:, idx[1]], ddof, 1)
-        ax.set_title(r"$\chi^2_{\textrm{red}}$ " + name)
-        ax.set_xlabel(r'$K_1(\si{\km\per\second})$')
-        ax.set_ylabel(r'$\chi_{\textrm{red}}^2$')
-        # plt.grid()
+        # fig = plt.figure()
+        # ax = plot_uncertainty(fig, kk1s, kk2s, cchisq, ddof)
+        # ax.set_title(r'$1-P(\nu/2, \chi^2/2)$ ' + name)
+        # ax.set_xlabel(r'$K_1(\si{\km\per\second})$')
+        # ax.set_ylabel(r'$K_2(\si{\km\per\second})$')
         # plt.tight_layout()
-        fig.savefig(folder + '/chisqmargk2{}.png'.format(name))
-        plt.close(fig)
+        # fig.savefig(folder + '/error{}.png'.format(name), dpi=200)
+        # plt.close(fig)
 
-        fig = plt.figure(figsize=(4, 6))
-        ax = plot_oneDee(fig, kk2s, cchisq[idx[0], :], ddof, 2)
-        ax.set_title(r"$\chi^2_{\textrm{red}}$ " + name)
-        ax.set_xlabel(r'$K_2(\si{\km\per\second})$')
-        ax.set_ylabel(r'$\chi_{\textrm{red}}^2$')
-        # plt.grid()
-        # plt.tight_layout()
-        fig.savefig(folder + '/chisqmargk1{}.png'.format(name), dpi=200)
-        plt.close(fig)
+        # fig = plt.figure(figsize=(4, 6))
+        # ax = plot_oneDee(fig, kk1s, cchisq[:, idx[1]], ddof, 1)
+        # ax.set_title(r"$\chi^2_{\textrm{red}}$ " + name)
+        # ax.set_xlabel(r'$K_1(\si{\km\per\second})$')
+        # ax.set_ylabel(r'$\chi_{\textrm{red}}^2$')
+        # # plt.grid()
+        # # plt.tight_layout()
+        # fig.savefig(folder + '/chisqmargk2{}.png'.format(name))
+        # plt.close(fig)
+        #
+        # fig = plt.figure(figsize=(4, 6))
+        # ax = plot_oneDee(fig, kk2s, cchisq[idx[0], :], ddof, 2)
+        # ax.set_title(r"$\chi^2_{\textrm{red}}$ " + name)
+        # ax.set_xlabel(r'$K_2(\si{\km\per\second})$')
+        # ax.set_ylabel(r'$\chi_{\textrm{red}}^2$')
+        # # plt.grid()
+        # # plt.tight_layout()
+        # fig.savefig(folder + '/chisqmargk1{}.png'.format(name), dpi=200)
+        # plt.close(fig)
     else:
         ddof -= 1
-        fig = plt.figure(figsize=(4, 6))
-        ax = plot_oneDee(fig, kk2s, cchisq[idx[0], :], ddof, 2)
-        ax.set_title(r"$\chi^2_{\textrm{red}}$ " + name)
-        ax.set_xlabel(r'$K_2(\si{\km\per\second})$')
-        ax.set_ylabel(r'$\chi_{\textrm{red}}^2$')
-        # plt.grid()
-        # plt.tight_layout()
-        fig.savefig(folder + '/chisqmargk1{}.png'.format(name), dpi=200)
-        plt.close(fig)
+        # fig = plt.figure(figsize=(4, 6))
+        # ax = plot_oneDee(fig, kk2s, cchisq[idx[0], :], ddof, 2)
+        # ax.set_title(r"$\chi^2_{\textrm{red}}$ " + name)
+        # ax.set_xlabel(r'$K_2(\si{\km\per\second})$')
+        # ax.set_ylabel(r'$\chi_{\textrm{red}}^2$')
+        # # plt.grid()
+        # # plt.tight_layout()
+        # fig.savefig(folder + '/chisqmargk1{}.png'.format(name), dpi=200)
+        # plt.close(fig)
 
 
 def get_min_of_run(wd):
@@ -246,11 +254,13 @@ def get_min_of_run(wd):
 
 
 if __name__ == "__main__":
-    import matplotlib.pyplot as plt
-    import plotsetup  # noqa
-    import sys
 
+    import sys
+    import os
     folder = sys.argv[1]
+    pngs = glob.glob(folder+'/**.png')
+    for png in pngs:
+        os.remove(png)
     lines = glob.glob(folder + '/chisqs/chisq*')
     for i in range(len(lines)):
         lines[i] = lines[i].rsplit('.', maxsplit=1)[0].rsplit('chisq', maxsplit=1)[-1]

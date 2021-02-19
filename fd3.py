@@ -31,10 +31,12 @@ except IndexError:
     exit()
 
 # geometrical orbit elements and its error. error is ignored if not monte_carlo
-orbit = (3251, 56547, 0.648, 30.9, 31.0, 52.0)  # p, t0, e, omega(A), K1, K2
+orbit = (3251, 56547, 0.648, 30.9)  # p, t0, e, omega(A)
+k1 = 31
+k2 = 52
 
 # lightfactors of your components (if thirdlight, give three)
-lfs = [0.57, 0.43]
+lfs = [0.6317, 0.3783]
 # do you want a (static) third component to be found?
 thirdlight = False
 
@@ -45,24 +47,6 @@ sampling = 0.03
 lines = dict()
 lines['range'] = (4010, 6800)
 ############################################################
-
-
-def new_threads():
-    d3threads.clear()
-    for ffd3line in fd3lineobjects:
-        d3threads.append(fd3classes.Fd3Thread(fd3folder, ffd3line))
-
-
-def run_join_threads(threads):
-    for thread in threads:
-        try:
-            thread.start()
-        except Exception as e:
-            print(repr(thread), e)
-
-    for thread in threads:
-        thread.join()
-
 
 starttime = time.time()
 print('starting setup...')
@@ -98,7 +82,7 @@ print('building fd3gridline object for:')
 for line in lines.keys():
     print(' {}'.format(line))
     fd3lineobjects.append(
-        fd3classes.Fd3class(line, lines[line], sampling, allfiles, thirdlight, orbit, lfs=lfs))
+        fd3classes.Fd3class(line, lines[line], sampling, allfiles, thirdlight, orbit, lfs=lfs, k1=k1, k2=k2))
 
 d3threads = list()
 setuptime = time.time()
@@ -108,9 +92,9 @@ now = time.time()
 for line in fd3lineobjects:
     line.run_fd3(fd3folder)
 for line in fd3lineobjects:
-    # line.recombine_and_renorm()
-    plt.title('k2 = {}'.format(orbit[5]))
-    line.plot_fd3_results(offset=0.0)
+    line.recombine_and_renorm()
+for line in fd3lineobjects:
+    line.run_fd3(fd3folder)
 
 
 print('Thanks for your patience! You waited a whopping {} hours!'.format((time.time() - starttime) / 3600))

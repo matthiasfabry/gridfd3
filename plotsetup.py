@@ -4,6 +4,7 @@ import matplotlib
 pdf_with_latex = {                      # setup matplotlib to use latex for output
     "text.usetex": True,                # use LaTeX to write all text
     "axes.labelsize": 20,               # LaTeX default is 10pt font.
+    "font.family": 'serif',
     "font.size": 20,
     "legend.fontsize": 10,               # Make the legend/label fonts
     "xtick.labelsize": 15,               # a little smaller
