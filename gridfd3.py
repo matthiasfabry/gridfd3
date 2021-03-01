@@ -1,7 +1,8 @@
 """
 User script showing the typical use case for gridfd3.
 First a list of files containing the relevant spectra is globbed.
-Next, we specify the orbital parameters and the RV semi-amplitude ranges that need to be explored, and various other
+Next, we specify the orbital parameters and the RV semi-amplitude ranges that need to be
+explored, and various other
 parameters such as the sampling rate and light factors
 """
 
@@ -12,20 +13,21 @@ import time
 
 import modules.gridfd3classes as fd3classes
 
-
 # input
 # define working directories
 obj = '9_Sgr/resub6'
 # gridfd3folder = obj + '/' + str(datetime.today().strftime('%y%m%dT%H%M%S'))
 gridfd3folder = obj
-
+fd3folder = obj+'/fd3'
 # find locations of your spectra
-spectra_set = ['9_Sgr']  # allows for subsetting spectra
+spectra_set = ['9_Sgr/HERMES', '9_Sgr/FEROS', '9_Sgr/HARPS', '9_Sgr/UVES'
+               ]  # allows for subsetting spectra
 try:
     spec_folder = list()
     for folder in spectra_set:
         spec_folder.append(
-            glob.glob('/Users/matthiasf/data/spectra/' + folder)[0])  # actual path to your folder containing spectra
+            glob.glob('/Users/matthiasf/data/spectra/' + folder)[
+                0])  # actual path to your folder containing spectra
 except IndexError:
     spec_folder = None
     print('no spectra folder of object found')
@@ -52,10 +54,14 @@ back = False
 # orbit_err_unscale = np.array([[14.2, 2.396, 0.002, 0.452]])
 # the correlation matrix
 # orbit_covar_unscale = np.array(
-#     [[2.016706010889813285e+02, 2.650853464144408811e+00, 1.653940436054600338e-02, 1.510087481644369234e+00],
-#      [2.650853464144408811e+00, 5.739323098131123402e+00, 3.250949346561587527e-03, 1.040789875201268533e+00],
-#      [1.653940436054600338e-02, 3.250949346561587527e-03, 3.299601439411175585e-06, 6.442714780292257666e-04],
-#      [1.510087481644369234e+00, 1.040789875201268533e+00, 6.442714780292257666e-04, 2.043357582025700225e-01]])
+#     [[2.016706010889813285e+02, 2.650853464144408811e+00, 1.653940436054600338e-02,
+#     1.510087481644369234e+00],
+#      [2.650853464144408811e+00, 5.739323098131123402e+00, 3.250949346561587527e-03,
+#      1.040789875201268533e+00],
+#      [1.653940436054600338e-02, 3.250949346561587527e-03, 3.299601439411175585e-06,
+#      6.442714780292257666e-04],
+#      [1.510087481644369234e+00, 1.040789875201268533e+00, 6.442714780292257666e-04,
+#      2.043357582025700225e-01]])
 # # now we scale the correlation matrix to the full error
 # scale = np.matmul((orbit_err / orbit_err_unscale).T, orbit_err / orbit_err_unscale)
 # orbit_covar_scale = scale * orbit_covar_unscale
@@ -69,7 +75,7 @@ sampling = 0.07
 # enter wavelength range(s) in natural log of wavelength and give name of line. Must be a dict.
 lines = dict()
 # lines['HeI4009'] = (4002, 4016)
-# lines['HeI+II4026'] = (4020, 4031)
+lines['HeI+II4026'] = (4020, 4031)
 # lines['NIV4058'] = (4050, 4065)
 # lines['SiIV4089'] = (4086, 4092)
 lines['Hdelta'] = (4091.8, 4112.5)
@@ -80,15 +86,15 @@ lines['HeII4200'] = (4193, 4206)
 lines['Hgamma'] = (4327.8, 4354.5)
 # lines['NIII4379'] = (4376, 4384)
 # lines['HeI4387'] = (4384, 4392)
-# lines['HeI4471'] = (4465, 4475.3)
+lines['HeI4471'] = (4465, 4477)
 lines['HeII4541'] = (4532.5, 4550)
 # lines['FeII4584'] = (4578, 4589)
 # lines['CIII4650'] = (4625, 4660)
 lines['HeII4686'] = (4677, 4692)
 # lines['HeI4713'] = (4710, 4716)
 lines['Hbeta'] = (4841.6, 4878)
-# lines['HeI4922'] = (4917, 4927)
-# lines['HeI5016'] = (5011, 5026)
+lines['HeI4922'] = (4917, 4927)
+lines['HeI5016'] = (5011, 5026)
 # lines['FeII5167'] = (5162, 5175)
 # lines['FeII5198'] = (5190, 5205)
 # lines['FeII5233'] = (5225, 5238)
@@ -100,7 +106,7 @@ lines['HeII5411'] = (5399.2, 5424.1)
 # lines['CIII5696'] = (5680, 5712)
 # lines['FeII5780'] = (5774, 5787)
 # lines['CIV5801+12'] = (5797.8, 5815.7)
-# lines['HeI5875'] = (5871, 5879.5)
+lines['HeI5875'] = (5871, 5879.5)
 # lines['Halpha'] = (6550, 6578)
 # lines['HeI6678'] = (6667, 6700)
 # lines['OI8446'] = (8437, 8455)
@@ -113,7 +119,8 @@ lines['HeII5411'] = (5399.2, 5424.1)
 
 def run_join_threads(threads):
     """
-    runs and joins the threads passed in the list 'threads'. Also catches any exceptions thrown in the threads
+    runs and joins the threads passed in the list 'threads'. Also catches any exceptions thrown
+    in the threads
     :param threads: list of threads to be run and joined
     """
     for thread in threads:
@@ -121,7 +128,7 @@ def run_join_threads(threads):
             thread.start()
         except Exception as e:
             print(repr(thread), e)
-
+    
     for thread in threads:
         thread.join()
 
@@ -147,9 +154,10 @@ if K == 0:
 
 # make working directories
 try:
-    pathlib.Path(gridfd3folder).mkdir(parents=True)
+    pathlib.Path(fd3folder).mkdir(parents=True)
 except FileExistsError:
-    print('folder already exists, I will overwrite in this directory! Do you want to continue? [y]/n')
+    print(
+        'folder already exists, I will overwrite in this directory! Do you want to continue? [y]/n')
     ans = input()
     while True:
         if ans == 'n':
@@ -185,7 +193,8 @@ print('building fd3gridline object for:')
 for line in lines.keys():
     print(' {}'.format(line))
     fd3lineobjects.append(
-        fd3classes.Fd3class(line, lines[line], sampling, allfiles, thirdlight, orbit, lfs=lfs, k1s=k1str, k2s=k2str))
+        fd3classes.Fd3class(line, lines[line], sampling, allfiles, thirdlight, orbit, lfs=lfs,
+                            k1s=k1str, k2s=k2str))
 
 # build the threads
 print('building threads')
@@ -194,9 +203,23 @@ gridthreads = list()
 
 for ffd3line in fd3lineobjects:
     gridthreads.append(fd3classes.GridFd3Thread(gridfd3folder, ffd3line))
+
+d3threads = list()
+for fd3line in fd3lineobjects:
+    fd3line.set_k1(37)
+    fd3line.set_k2(47)
+    d3threads.append(fd3classes.Fd3Thread(fd3folder, fd3line))
+
+# do an initial separation to renormalize on
+run_join_threads(d3threads)
+# recombine_and_renorm
+print('renormalizing')
+for fd3line in fd3lineobjects:
+    fd3line.recombine_and_renorm()
 setuptime = time.time()
 print('setup took {}s\n'.format(setuptime - starttime))
 print('starting runs!')
 now = time.time()
 run_join_threads(gridthreads)
-print('Thanks for your patience! You waited a whopping {} hours!'.format((time.time() - starttime) / 3600))
+print('Thanks for your patience! You waited a whopping {} hours!'.format(
+    (time.time() - starttime) / 3600))

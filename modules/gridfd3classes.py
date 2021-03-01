@@ -125,7 +125,7 @@ class Fd3class:
             turb = np.random.default_rng().normal(scale=self.orberr)
         else:
             turb = np.random.default_rng().normal(size=(4, 1))
-            c = spalg.cholesky(self.orbcovar)
+            c = spalg.cholesky(self.orbcovar, lower=True)
             turb = np.dot(c, turb).T
         return self.orb + turb[0]
 
@@ -279,10 +279,10 @@ class Fd3class:
         with open(wd + '/out{}'.format(repr(self))) as f:
             llines = f.readlines()
             llines.pop(0)
-            kk1s = np.zeros(len(llines))
-            kk2s = np.zeros(len(llines))
-            cchisq = np.zeros(len(llines))
-            for j in range(len(llines)):
+            kk1s = np.zeros(n := len(llines))
+            kk2s = np.zeros(n)
+            cchisq = np.zeros(n)
+            for j in range(n):
                 lline = re.split('[ ]|(?![\d.])', llines[j])
                 kk1s[j] = np.float64(lline[0])
                 kk2s[j] = np.float64(lline[1])

@@ -258,9 +258,9 @@ if __name__ == "__main__":
     import sys
     import os
     folder = sys.argv[1]
-    pngs = glob.glob(folder+'/**.png')
-    for png in pngs:
-        os.remove(png)
+    # pngs = glob.glob(folder+'/**.png')
+    # for png in pngs:
+    #     os.remove(png)
     lines = glob.glob(folder + '/chisqs/chisq*')
     for i in range(len(lines)):
         lines[i] = lines[i].rsplit('.', maxsplit=1)[0].rsplit('chisq', maxsplit=1)[-1]

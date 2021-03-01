@@ -7,7 +7,7 @@ class SpectrumError(Exception):
     """
     Exception when something goes wrong loading spectra
     """
-
+    
     def __init__(self, file, line, msg):
         super().__init__()
         print(' Spectrum error for:', line, 'due to file', file + ':', msg)
@@ -15,11 +15,13 @@ class SpectrumError(Exception):
 
 def getspectrum(line, file, lambdabase, edgepoints=20):
     """
-    This function must return the fluxvalues evaluated in an equally spaced, logarithmic wavelength basis 'lambdabase',
+    This function must return the fluxvalues evaluated in an equally spaced, logarithmic
+    wavelength basis 'lambdabase',
     a noise estimation and an mjd of the spectrum contained in the parameter 'file'.
     If you determine this file does not contain a spectrum on lambdabase, raise a SpectrumException
     :param line: string representing the line you are trying to disentangle
-    :param file: string that points to the file containing the spectrum (which you glob in the main gridfd3.py script)
+    :param file: string that points to the file containing the spectrum (which you glob in the
+    main gridfd3.py script)
     :param lambdabase: wavelength base (in log space) you must return the fluxvalues of
     :param edgepoints: number of points before the line that are used to estimate the noise
     :return: flux, noise, mjd as stated in the description of this function or None
@@ -40,12 +42,15 @@ def getspectrum(line, file, lambdabase, edgepoints=20):
         # append in base evaluated flux values
         flux = spint.splev(lambdabase, logspline.data[0])
         if np.average(flux) < 0.1:
-            raise SpectrumError(file, line, 'average flux is low here, might be a gap in the spectrum, skipping')
+            raise SpectrumError(file, line,
+                                'average flux is low here, might be a gap in the spectrum, '
+                                'skipping')
         # determine noise near this line
         noise = np.std(flux[:edgepoints - 1])
         if np.isnan(noise):
             print(file, line)
             print(flux[:edgepoints - 1])
+
         # get mjd
         mjd = hdul[0].header['MJD-obs']
         return flux, noise, mjd

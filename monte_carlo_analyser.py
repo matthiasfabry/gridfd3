@@ -2,9 +2,11 @@
 Takes a single folder as a runtime argument
 """
 import glob
-import sys
 import os
+import sys
+
 import numpy as np
+
 import outfile_analyser as oa
 # noinspection PyUnresolvedReferences
 import plotsetup
@@ -16,9 +18,8 @@ except IndexError:
     print("Give a folder to work on!")
     exit()
 
-
 lines = dict()
-# lines['Heta'] = (8.2490, 8.2545, 1e-5)
+# lines['Heta'] = (8.2490, 8.2545, 1e-5)  # actuals values here don't matter
 # lines['Hzeta'] = (8.2630, 8.2685, 1e-5)
 # lines['FeI3923'] = (8.2730, 8.2765, 1e-5)
 # lines['Hepsilon'] = (8.2845, 8.2888)
@@ -45,7 +46,7 @@ lines['HeII5411'] = (8.5940, 8.5986, 5e-6)
 # lines['FeII5780'] = (8.6617, 8.6629, 1e-5)
 # lines['CIV5801'] = (8.6652, 8.6667, 1e-5)
 # lines['CIV5812'] = (8.6668, 8.6685, 1e-5)
-lines['HeI5875'] = (8.6777, 8.6794, 5e-6)
+# lines['HeI5875'] = (8.6777, 8.6794, 5e-6)
 # lines['Halpha'] = (8.7865, 8.7920, 1e-5)
 # lines['HeI6678'] = (8.805, 8.8095, 5e-6)
 
@@ -57,7 +58,7 @@ iterations = 0
 c = 0
 while True:
     c += 1
-    if not os.path.isdir(folder+'/thread{}'.format(c)):
+    if not os.path.isdir(folder + '/thread{}'.format(c)):
         break
     i = 0
     while True:
@@ -65,12 +66,12 @@ while True:
         k1it, k2it, combit, chisqit = None, None, None, None
         must_break = False
         for line in lines:
-            files = sorted(glob.glob(folder + '/thread{}/chisqs/chisq{}{}.npz'.format(c, line, i), recursive=True))
+            files = sorted(glob.glob(folder + '/thread{}/chisqs/chisq{}{}.npz'.format(c, line, i)))
             if files is None or len(files) < 1:
                 print('no file at thread', c, 'line', line, 'iteration', i)
                 must_break = True
                 break
-
+            
             k1shere, k2shere, chisqhere = oa.file_parser(files[0])
             if k1it is None:
                 k1s = k1shere
@@ -95,6 +96,6 @@ print('total iterations', iterations)
 mink1s = sorted(mink1s)
 mink2s = sorted(mink2s)
 combs = np.array(combs)
-np.save(folder+'/mink1s', mink1s)
-np.save(folder+'/mink2s', mink2s)
-np.save(folder+'/combs', combs)
+np.save(folder + '/mink1s', mink1s)
+np.save(folder + '/mink2s', mink2s)
+np.save(folder + '/combs', combs)

@@ -7,18 +7,16 @@ parameters such as the sampling rate and light factors
 import glob
 import pathlib
 import time
-import matplotlib.pyplot as plt
+
 import modules.gridfd3classes as fd3classes
 
 # input
 # define working directories
-obj = '9_Sgr'
-# gridfd3folder = obj + '/' + str(datetime.today().strftime('%y%m%dT%H%M%S'))
-gridfd3folder = obj
-fd3folder = gridfd3folder + '/fd3'
+obj = '9_Sgr/resubfd3'
+fd3folder = obj
 
 # find locations of your spectra
-spectra_set = ['9_Sgr'
+spectra_set = ['9_Sgr/'
                ]  # allows for subsetting spectra
 try:
     spec_folder = list()
@@ -31,17 +29,17 @@ except IndexError:
     exit()
 
 # geometrical orbit elements and its error. error is ignored if not monte_carlo
-orbit = (3251, 56547, 0.648, 30.9)  # p, t0, e, omega(A)
-k1 = 31
-k2 = 52
+orbit = (3261, 56547, 0.648, 30.7)  # p, t0, e, omega(A)
+k1 = 36
+k2 = 49
 
 # lightfactors of your components (if thirdlight, give three)
-lfs = [0.6317, 0.3783]
+lfs = [0.6173, 0.3827]
 # do you want a (static) third component to be found?
 thirdlight = False
 
 # sampling of your spectra in angstrom
-sampling = 0.03
+sampling = 0.07
 
 # enter wavelength range(s) in natural log of wavelength and give name of line. Must be a dict.
 lines = dict()
@@ -67,7 +65,6 @@ if K == 0:
     print('no lines selected')
     exit()
 
-
 pathlib.Path(fd3folder).mkdir(parents=True, exist_ok=True)
 
 # save the run_fd3 parameters for later reference
@@ -82,7 +79,8 @@ print('building fd3gridline object for:')
 for line in lines.keys():
     print(' {}'.format(line))
     fd3lineobjects.append(
-        fd3classes.Fd3class(line, lines[line], sampling, allfiles, thirdlight, orbit, lfs=lfs, k1=k1, k2=k2))
+        fd3classes.Fd3class(line, lines[line], sampling, allfiles, thirdlight, orbit, lfs=lfs,
+                            k1=k1, k2=k2))
 
 d3threads = list()
 setuptime = time.time()
@@ -91,11 +89,6 @@ print('starting runs!')
 now = time.time()
 for line in fd3lineobjects:
     line.run_fd3(fd3folder)
-for line in fd3lineobjects:
-    line.recombine_and_renorm()
-for line in fd3lineobjects:
-    line.run_fd3(fd3folder)
 
-
-print('Thanks for your patience! You waited a whopping {} hours!'.format((time.time() - starttime) / 3600))
-plt.show()
+print('Thanks for your patience! You waited a whopping {} hours!'.format(
+    (time.time() - starttime) / 3600))

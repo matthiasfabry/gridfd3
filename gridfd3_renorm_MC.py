@@ -1,7 +1,8 @@
 """
 User script showing the typical use case for monte carlo sampling the gridfd3 procedure.
 First a list of files containing the relevant spectra is globbed.
-Next, we specify the orbital parameters and the RV semi-amplitude ranges that need to be explored, and various other
+Next, we specify the orbital parameters and the RV semi-amplitude ranges that need to be
+explored, and various other
 parameters such as the sampling rate and light factors
 """
 import glob
@@ -13,10 +14,9 @@ import numpy as np
 import modules.gridfd3classes as fd3classes
 
 # input
-
 # specify working directories, can be anything you want
 obj = '9_Sgr'
-gridfd3folder = obj + '/recombMCcovarresub'
+gridfd3folder = obj + '/recombMCcovarresub2'
 fd3folder = gridfd3folder + '/fd3'
 spectra_set = ['9_Sgr']  # listing allows for subsetting spectra
 
@@ -45,11 +45,14 @@ orbit_err = np.array([[69, 12, 0.009, 2.3]])
 orbit_err_unscale = np.array(
     [[14.2, 2.396, 0.002, 0.452]])  # not properly scaled errors corresponding to the matrix below
 orbit_covar_unscale = np.array(  # correlation matrix
-    [[2.016706010889813285e+02, 2.650853464144408811e+00, 1.653940436054600338e-02, 1.510087481644369234e+00],
-     [2.650853464144408811e+00, 5.739323098131123402e+00, 3.250949346561587527e-03, 1.040789875201268533e+00],
-     [1.653940436054600338e-02, 3.250949346561587527e-03, 3.299601439411175585e-06, 6.442714780292257666e-04],
-     [1.510087481644369234e+00, 1.040789875201268533e+00, 6.442714780292257666e-04, 2.043357582025700225e-01]])
-
+    [[2.016706010889813285e+02, 2.650853464144408811e+00, 1.653940436054600338e-02,
+      1.510087481644369234e+00],
+     [2.650853464144408811e+00, 5.739323098131123402e+00, 3.250949346561587527e-03,
+      1.040789875201268533e+00],
+     [1.653940436054600338e-02, 3.250949346561587527e-03, 3.299601439411175585e-06,
+      6.442714780292257666e-04],
+     [1.510087481644369234e+00, 1.040789875201268533e+00, 6.442714780292257666e-04,
+      2.043357582025700225e-01]])
 
 # scale the matrix to the properly scaled errors 'orbit_err'
 scale = np.matmul((orbit_err / orbit_err_unscale).T, orbit_err / orbit_err_unscale)
@@ -58,7 +61,7 @@ orbit_covar_scale = scale * orbit_covar_unscale
 # monte carlo switches. If monte_carlo, at least one of the others needs to be true.
 # If not monte_carlo, the others are ignored
 monte_carlo = True
-N = 10
+N = 1000
 perturb_orbit = True
 perturb_spectra = True
 
@@ -68,40 +71,46 @@ thirdlight = False
 # lightfactors of your components (if thirdlight, give three)
 lfs = [0.6173, 0.3827]
 
-# sampling of your spectra in angstrom
 sampling = 0.07
 
-# enter wavelength range(s) in angstrom and give name to the line. Must be a dict.
 lines = dict()
 # lines['HeI4009'] = (4002, 4016)
-# lines['HeI+II4026'] = (4018, 4033)
-lines['Hdelta'] = (4086.7, 4111.3)
-# lines['HeI4121'] = (4117, 4125)
-# lines['HeI4143'] = (4135, 4149)
-lines['HeII4200'] = (4192.3, 4207.0)
-lines['Hgamma'] = (4324.2, 4352.5)
-# lines['HeI4387'] = (4377, 4398)
-# lines['HeI4471'] = (4465, 4477)
+lines['HeI+II4026'] = (4020, 4031)
+# lines['NIV4058'] = (4050, 4065)
+# lines['SiIV4089'] = (4086, 4092)
+lines['Hdelta'] = (4091.8, 4112.5)
+# lines['SiIV4116'] = (4113, 4118)
+# lines['HeI4121'] = (4114, 4127)
+# lines['HeI4143'] = (4135, 4152)
+lines['HeII4200'] = (4193, 4206)
+lines['Hgamma'] = (4327.8, 4354.5)
+# lines['NIII4379'] = (4376, 4384)
+# lines['HeI4387'] = (4384, 4392)
+lines['HeI4471'] = (4465, 4477)
+lines['HeII4541'] = (4532.5, 4550)
 # lines['FeII4584'] = (4578, 4589)
-lines['HeII4541'] = (4532.4, 4550.5)
-lines['HeII4686'] = (4679.7, 4691.4)
-# lines['HeI4713'] = (4707, 4720)
-lines['Hbeta'] = (4841.6, 4878.0)
+# lines['CIII4650'] = (4625, 4660)
+lines['HeII4686'] = (4677, 4692)
+# lines['HeI4713'] = (4710, 4716)
+lines['Hbeta'] = (4841.6, 4878)
+lines['HeI4922'] = (4917, 4927)
+lines['HeI5016'] = (5011, 5026)
 # lines['FeII5167'] = (5162, 5175)
 # lines['FeII5198'] = (5190, 5205)
 # lines['FeII5233'] = (5225, 5238)
 # lines['FeII5276'] = (5270, 5282)
 # lines['FeII5316+SII5320'] = (5310, 5325)
 # lines['FeII5362'] = (5356, 5368)
-lines['HeII5411'] = (5396.4, 5426.2)
-# lines['OIII5592'] = (5584, 5600)
+lines['HeII5411'] = (5399.2, 5424.1)
+# lines['OIII5592'] = (5583, 5600)
 # lines['CIII5696'] = (5680, 5712)
-# lines['FeII5780'] = (5770, 5790)
-# lines['CIV5801+12'] = (5798, 5817)
-# lines['HeI5875'] = (5869.4, 5881.1)
-# lines['Halpha'] = (6545, 6580)
-# lines['HeI6678'] = (6674, 6682)
+# lines['FeII5780'] = (5774, 5787)
+# lines['CIV5801+12'] = (5797.8, 5815.7)
+lines['HeI5875'] = (5871, 5879.5)
+# lines['Halpha'] = (6550, 6578)
+# lines['HeI6678'] = (6667, 6700)
 # lines['OI8446'] = (8437, 8455)
+# lines['range'] = (4010, 5885)
 
 ############################################################
 # Here we start our experiment/runs
@@ -109,7 +118,8 @@ lines['HeII5411'] = (5396.4, 5426.2)
 
 def run_join_threads(threads):
     """
-    runs and joins the threads passes in list 'thread'. Also catched any exceptions raised within the threads.
+    runs and joins the threads passes in list 'thread'. Also catched any exceptions raised within
+    the threads.
     :param threads: list of threads to start and join when completed
     """
     for thread in threads:
@@ -117,7 +127,7 @@ def run_join_threads(threads):
             thread.start()
         except Exception as e:
             print(repr(thread), e)
-
+    
     for thread in threads:
         thread.join()
 
@@ -186,22 +196,24 @@ for fd3line in fd3lineobjects:
     fd3line.recombine_and_renorm()
 
 import os
-cpus = min(os.cpu_count(), N)
-if monte_carlo:
-    # create threads
-    print('number of threads will be {}'.format(cpus))
-    print('each thread will have {} iterations to complete'.format(N / cpus))
-    atleast = int(N / cpus)
-    remainder = int(N % cpus)
 
-    for i in range(remainder):
-        gridthreads.append(fd3classes.GridFd3MCThread(gridfd3folder, i + 1, atleast + 1, fd3lineobjects))
-    for i in range(remainder, cpus):
-        gridthreads.append(fd3classes.GridFd3MCThread(gridfd3folder, i + 1, atleast, fd3lineobjects))
+cpus = min(os.cpu_count(), N)
+# create threads
+print('number of threads will be {}'.format(cpus))
+print('each thread will have {} iterations to complete'.format(N / cpus))
+atleast = int(N / cpus)
+remainder = int(N % cpus)
+
+for i in range(remainder):
+    gridthreads.append(
+        fd3classes.GridFd3MCThread(gridfd3folder, i + 1, atleast + 1, fd3lineobjects))
+for i in range(remainder, cpus):
+    gridthreads.append(fd3classes.GridFd3MCThread(gridfd3folder, i + 1, atleast, fd3lineobjects))
 
 setuptime = time.time()
 print('setup took {}s\n'.format(setuptime - starttime))
 # start the MC gridfd3 process
 print('starting runs!')
 run_join_threads(gridthreads)
-print('Thanks for your patience! You waited a whopping {} hours!'.format((time.time() - starttime) / 3600))
+print('Thanks for your patience! You waited a whopping {} hours!'.format(
+    (time.time() - starttime) / 3600))
