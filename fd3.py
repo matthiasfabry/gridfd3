@@ -12,11 +12,11 @@ import modules.gridfd3classes as fd3classes
 
 # input
 # define working directories
-obj = '9_Sgr/resubfd3'
+obj = 'HR_6819/test'
 fd3folder = obj
 
 # find locations of your spectra
-spectra_set = ['9_Sgr/'
+spectra_set = ['HR_6819/FEROS'
                ]  # allows for subsetting spectra
 try:
     spec_folder = list()
@@ -29,21 +29,21 @@ except IndexError:
     exit()
 
 # geometrical orbit elements and its error. error is ignored if not monte_carlo
-orbit = (3261, 56547, 0.648, 30.7)  # p, t0, e, omega(A)
-k1 = 36
-k2 = 49
+orbit = (40.335, 53116.9, 0, 270)  # p, t0, e, omega(A)
+k1 = 60.4
+k2 = 4.0
 
 # lightfactors of your components (if thirdlight, give three)
-lfs = [0.6173, 0.3827]
+lfs = [0.45, 0.55]
 # do you want a (static) third component to be found?
 thirdlight = False
 
 # sampling of your spectra in angstrom
-sampling = 0.07
+sampling = 0.2
 
 # enter wavelength range(s) in natural log of wavelength and give name of line. Must be a dict.
 lines = dict()
-lines['range'] = (4010, 6800)
+lines['range'] = (4010, 5000)
 ############################################################
 
 starttime = time.time()
